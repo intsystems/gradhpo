@@ -33,7 +33,8 @@ a broad class of tasks, with full documentation and automated testing.
 
 Library Planning
 ===============================
-```├── gradhpo/
+```
+├── gradhpo/
 │   ├── __init__.py
 │   ├── core/
 │   │   ├── __init__.py
@@ -64,7 +65,8 @@ Library Planning
 │   └── algorithms.md
 ├── setup.py
 ├── requirements.txt
-└── README.md```
+└── README.md
+```
 
 Software modules developed as part of the study
 ======================================================
