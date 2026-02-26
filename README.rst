@@ -33,7 +33,7 @@ a broad class of tasks, with full documentation and automated testing.
 
 Library Planning
 ================
-Can be found `here <https://github.com/intsystems/gradhpo/tree/master/doc/Library_planning.pdf>`
+Can be found `here <https://github.com/intsystems/gradhpo/tree/master/doc/Library_planning.pdf>`_.
 
 Software modules developed as part of the study
 ======================================================
