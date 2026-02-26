@@ -31,43 +31,6 @@ reusable JAX library: T1-T2 with DARTS numerical approximation, Generalized Gree
 Gradient-Based HPO, Online HPO with Hypergradient Distillation. The library provides a unified API suitable for
 a broad class of tasks, with full documentation and automated testing.
 
-Library Planning
-===============================
-```
-├── gradhpo/
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── state.py              # BilevelState class
-│   │   ├── base.py               # Base optimizer class
-│   │   └── types.py              # Type definitions
-│   ├── algorithms/
-│   │   ├── __init__.py
-│   │   ├── t1_t2.py             # T1-T2 with DARTS
-│   │   ├── greedy.py            # Greedy gradient-based
-│   │   └──  online.py            # Online with hypergradient distillation
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── gradients.py         # Gradient computation utilities
-│   │   ├── validation.py        # Input validation
-│   │   └── logging.py           # Logging utilities
-│   └── examples/
-│       ├── mnist_example.py
-│       ├── learning_rate_opt.py
-│       └── data_augmentation_opt.py
-├── tests/
-│   ├── test_t1_t2.py
-│   ├── test_greedy.py
-│   └── test_online.py
-├── docs/
-│   ├── index.md
-│   ├── quickstart.md
-│   └── algorithms.md
-├── setup.py
-├── requirements.txt
-└── README.md
-```
-
 Software modules developed as part of the study
 ======================================================
 1. A python package gradhpo with all implementation `here <https://github.com/intsystems/gradhpo/tree/master/src>`_.
