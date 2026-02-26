@@ -31,6 +31,10 @@ reusable JAX library: T1-T2 with DARTS numerical approximation, Generalized Gree
 Gradient-Based HPO, Online HPO with Hypergradient Distillation. The library provides a unified API suitable for
 a broad class of tasks, with full documentation and automated testing.
 
+Library Planning
+================
+Can be found `here <https://github.com/intsystems/gradhpo/tree/master/doc/Library_planning.pdf>`
+
 Software modules developed as part of the study
 ======================================================
 1. A python package gradhpo with all implementation `here <https://github.com/intsystems/gradhpo/tree/master/src>`_.
