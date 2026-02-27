@@ -27,7 +27,7 @@ the selection of suitable hyperparameters given a validation dataset. Gradient-b
 address this via bilevel optimization, enabling optimization over billion-dimensional search
 spaces - far beyond the reach of classical approaches such as grid search or Bayesian
 optimization. This project implements and wraps key gradient-based HPO algorithms as a
-reusable PyTorch library: T1-T2 with DARTS numerical approximation, Generalized Greedy
+reusable JAX library: T1-T2 with DARTS numerical approximation, Generalized Greedy
 Gradient-Based HPO, Online HPO with Hypergradient Distillation. The library provides a unified API suitable for
 a broad class of tasks, with full documentation and automated testing.
 
