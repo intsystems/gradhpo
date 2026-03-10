@@ -10,6 +10,9 @@ GradFPO implements algorithms of short-horrizon gradient-based hyperparameter op
 
 - Find all the realizations of the methods on jax/torch. Including, complete libraries for SHGBO.
 
+  - Find complete libraries and analyze how algorithms interact with models on torch/jax.
+  - Find realizations of unique algorithms and try to decide the same interface
+
 - Identify pros and cons, similarities/differencies between all the realizations.
 
 - Decide, what is going to be present as experiment. Which metrics/datasets/problems are going to be used to draw a comparison with the existing realizations.
