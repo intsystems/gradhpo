@@ -15,7 +15,7 @@ GradFPO implements algorithms of short-horrizon gradient-based hyperparameter op
 
 - Identify pros and cons, similarities/differencies between all the realizations.
 
-- Decide, what is going to be present as experiment. Which metrics/datasets/problems are going to be used to draw a comparison with the existing realizations.
+- Decide, what is going to be presented as experiment. Which metrics/datasets/problems are going to be used to draw a comparison with the existing realizations.
 
 ### 2. Library realization
 
