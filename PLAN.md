@@ -25,6 +25,13 @@ GradFPO implements algorithms of short-horrizon gradient-based hyperparameter op
 
 - Write tests, covering all the algorithms.
 
+  - **Algorithm unit tests**: for each algorithm verify one hypergradient step on a simple model. Compare against finite-difference approximation; assert error below a threshold.
+  - **Convergence tests**: on a toy task run a full optimization loop and check that validation loss reaches an expected level within a fixed number of iterations.
+  - **Interface tests**: verify each algorithm conforms to the unified API — same signatures, compatibility with jax modules, correct handling of continuous and discrete hyperparameters.
+  - **Edge-case tests**: zero learning rate, empty batch, single inner-loop step, hyperparameters at boundary values. Assert graceful errors, no crashes.
+  - **Reproducibility tests**: with a fixed seed, two identical runs must produce bitwise-equal results.
+  - **Integration test (benchmark)**: end-to-end run of an algorithm on a standard benchmark, assert metrics fall within an expected range.
+
 - Realize benchmark (base experiment), using the library's functionality
 
 - Realize computational experiment
