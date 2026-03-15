@@ -48,9 +48,7 @@ GradFPO implements algorithms of short-horrizon gradient-based hyperparameter op
 
 ## FirePokerTable:
 
-Вот таблица в формате Markdown на основе предоставленного скриншота:
-
-| Имя задачи | Оценка сложности задачи |
+| Problem list | Estimated dificulty (in terms of "student evenings") |
 | :--- | :---: |
 | Read papers | 1 |
 | Find all the realizations of the methods on jax/torch. Including, complete libraries for SHGBO. | 1 |
