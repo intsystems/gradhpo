@@ -45,3 +45,23 @@ GradFPO implements algorithms of short-horrizon gradient-based hyperparameter op
 - Write a thorough tech report with extensive theoretical description of the algorithms and their comparison with current realizations.
 
 - Release completed version of the library via pypi and enable pip-install of it.
+
+## FirePokerTable:
+
+Вот таблица в формате Markdown на основе предоставленного скриншота:
+
+| Имя задачи | Оценка сложности задачи |
+| :--- | :---: |
+| Read papers | 1 |
+| Find all the realizations of the methods on jax/torch. Including, complete libraries for SHGBO. | 1 |
+| Identify pros and cons, similarities/differences between all the realizations. | 1/2 |
+| Decide, what is going to be presented as experiment. Which metrics/datasets/problems are going to be used to draw a comparison with the existing realizations. | 2 |
+| Decide on the structure of the library: which functions/classes/programming paradigms are going to be used. | 2 |
+| Realize all the algorithms according to the chosen structure. | 1 |
+| Write tests, covering all the algorithms. | 1 |
+| Realize benchmark (base experiment), using the library's functionality | 1 |
+| Realize computational experiment | 2 |
+| Write and set documentation via sphinx and make it public | 2 |
+| Write a blog-post with the description of the library, its functionality and computational experiment | 1 |
+| Write a thorough tech report with extensive theoretical description of the algorithms and their comparison with current realizations. | 3 |
+| Release completed version of the library via pypi and enable pip-install of it. | 1/2 |
