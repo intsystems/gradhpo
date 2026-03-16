@@ -12,6 +12,7 @@ from mylib.core.state import BilevelState
 from mylib.core.types import DataBatch, LossFunctions, PyTree, LossFn
 from mylib.algorithms.online import OnlineHypergradientOptimizer
 from mylib.algorithms.baselines import FOOptimizer, OneStepOptimizer
+from mylib.algorithms.t1t2 import T1T2Optimizer
 from mylib.utils.gradients import (
     tree_l2_norm,
     tree_normalize,
@@ -234,6 +235,21 @@ class TestAlgorithmSteps:
 
         assert not jnp.allclose(new_state.params['w1'], w['w1'])
 
+    def test_t1t2_optimizer_step(self):
+        key = jax.random.PRNGKey(42)
+        w = _init_model(key)
+        lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
+        batch = _make_batch(key)
+
+        opt = T1T2Optimizer(update_fn=_update_fn, gamma=0.9, T=5)
+        state = opt.init(w, lr)
+        new_state = opt.step(
+            state, batch, batch,
+            _loss_fn_bilevel, _loss_fn_bilevel, lr_hyper=1e-3)
+
+        assert not jnp.allclose(new_state.params['w1'], w['w1'])
+        assert new_state.step == 1
+
     def test_fo_optimizer_no_lambda_change(self):
         key = jax.random.PRNGKey(42)
         w = _init_model(key)
@@ -258,6 +274,22 @@ class TestAlgorithmSteps:
 
         opt = OnlineHypergradientOptimizer(
             update_fn=_update_fn, gamma=0.99, T=5)
+        state = opt.init(w, lr)
+        state = state.update(step=1)
+
+        hg = opt.compute_hypergradient(
+            state, batch, batch, _loss_fn_bilevel, _loss_fn_bilevel)
+
+        assert tree_l2_norm(hg) > 0
+
+    def test_t1t2_compute_hypergradient(self):
+        key = jax.random.PRNGKey(42)
+        w = _init_model(key)
+        lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
+        batch = _make_batch(key)
+
+        opt = T1T2Optimizer(
+            update_fn=_update_fn, gamma=0.9, T=5)
         state = opt.init(w, lr)
         state = state.update(step=1)
 
