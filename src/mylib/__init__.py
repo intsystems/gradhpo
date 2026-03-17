@@ -1,10 +1,27 @@
-__version__ = '0.0.2'
+__version__ = '0.1.0'
 
-from mylib.hyperdistill import (
-    hyperdistill_step,
-    linear_estimation,
-    run_hyperdistill,
-    one_step_step,
-    fo_step,
-    run_baseline,
+# New OOP API
+from mylib.core import (
+    BilevelState,
+    BilevelOptimizer,
+    PyTree,
+    LossFn,
+    MetricDict,
+    DataBatch,
+    LossFunctions,
+)
+from mylib.algorithms import (
+    OnlineHypergradientOptimizer,
+    FOOptimizer,
+    OneStepOptimizer,
+)
+from mylib.utils import (
+    tree_l2_norm,
+    tree_normalize,
+    tree_dot,
+    tree_zeros_like,
+    tree_lerp,
+    vjp_wrt_lambda,
+    vjp_wrt_both,
+    update_w_star,
 )

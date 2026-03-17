@@ -1,4 +1,4 @@
-"""Unit tests for the HyperDistill algorithm."""
+"""Unit tests for the HyperDistill algorithm (OOP API)."""
 
 import jax
 import jax.numpy as jnp
@@ -8,7 +8,11 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from mylib.hyperdistill import (
+from mylib.core.state import BilevelState
+from mylib.core.types import DataBatch, LossFunctions, PyTree, LossFn
+from mylib.algorithms.online import OnlineHypergradientOptimizer
+from mylib.algorithms.baselines import FOOptimizer, OneStepOptimizer
+from mylib.utils.gradients import (
     tree_l2_norm,
     tree_normalize,
     tree_dot,
@@ -17,15 +21,11 @@ from mylib.hyperdistill import (
     vjp_wrt_lambda,
     vjp_wrt_both,
     update_w_star,
-    hyperdistill_step,
-    linear_estimation,
-    one_step_step,
-    fo_step,
 )
 
 
 # ---------------------------------------------------------------------------
-# Helpers — tiny model for tests
+# Helpers -- tiny model for tests
 # ---------------------------------------------------------------------------
 
 def _init_model(key):
@@ -44,9 +44,15 @@ def _forward(params, x):
 
 
 def _loss_fn(params, batch):
+    """Internal loss: (params, batch) -> scalar."""
     x, y = batch
     logits = _forward(params, x)
     return -jnp.mean(jnp.sum(jax.nn.log_softmax(logits) * y, axis=-1))
+
+
+def _loss_fn_bilevel(params, hyperparams, batch):
+    """Bilevel loss: (params, hyperparams, batch) -> scalar."""
+    return _loss_fn(params, batch)
 
 
 def _update_fn(w, lr_params, batch):
@@ -93,7 +99,6 @@ class TestTreeUtils:
         a = {'v': jnp.array([0.0])}
         b = {'v': jnp.array([10.0])}
         mid = tree_lerp(a, b, 0.3)
-        # (1-0.3)*0 + 0.3*10 = 3.0
         assert jnp.isclose(mid['v'][0], 3.0)
 
 
@@ -144,17 +149,54 @@ class TestWStarUpdate:
         w_prev = {'a': jnp.array([2.0])}
         gamma = 0.5
         result = update_w_star(w_star, w_prev, gamma, t=2)
-        # p_2 = (0.5 - 0.25) / (1 - 0.25) = 0.25/0.75 = 1/3
         expected = (1.0 / 3) * 1.0 + (2.0 / 3) * 2.0
         assert jnp.isclose(result['a'][0], expected, atol=1e-5)
 
     def test_gamma0_returns_w_prev(self):
-        """gamma=0 should reduce to one-step: w_t* = w_{t-1}."""
         w_star = {'a': jnp.array([1.0])}
         w_prev = {'a': jnp.array([5.0])}
         result = update_w_star(w_star, w_prev, gamma=0.0, t=3)
-        # gamma=0: p_t = (0 - 0) / (1 - 0) = 0 → w_t* = w_{t-1}
         assert jnp.isclose(result['a'][0], 5.0, atol=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# BilevelState tests
+# ---------------------------------------------------------------------------
+
+class TestBilevelState:
+    def test_create(self):
+        params = {'w': jnp.ones(3)}
+        hyperparams = {'lr': jnp.ones(3) * 0.01}
+        state = BilevelState.create(params, hyperparams, None, None)
+        assert state.step == 0
+        assert state.metadata == {}
+        assert jnp.allclose(state.params['w'], 1.0)
+
+    def test_update(self):
+        state = BilevelState.create(
+            {'w': jnp.ones(3)}, {'lr': jnp.ones(3)}, None, None)
+        new_state = state.update(
+            params={'w': jnp.zeros(3)},
+            step=5,
+            metadata={'val_loss': 0.5},
+        )
+        assert jnp.allclose(new_state.params['w'], 0.0)
+        assert new_state.step == 5
+        assert new_state.get_metric('val_loss') == 0.5
+        assert jnp.allclose(state.params['w'], 1.0)
+
+    def test_get_metric_default(self):
+        state = BilevelState.create({'w': jnp.ones(1)}, {}, None, None)
+        assert state.get_metric('missing', 42) == 42
+
+    def test_metadata_merge(self):
+        state = BilevelState(
+            params={}, hyperparams={},
+            inner_opt_state=None, outer_opt_state=None,
+            step=0, metadata={'a': 1, 'b': 2},
+        )
+        new_state = state.update(metadata={'b': 99, 'c': 3})
+        assert new_state.metadata == {'a': 1, 'b': 99, 'c': 3}
 
 
 # ---------------------------------------------------------------------------
@@ -162,48 +204,67 @@ class TestWStarUpdate:
 # ---------------------------------------------------------------------------
 
 class TestAlgorithmSteps:
-    def test_hyperdistill_step_runs(self):
+    def test_online_optimizer_step(self):
         key = jax.random.PRNGKey(42)
         w = _init_model(key)
         lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
         batch = _make_batch(key)
 
-        w_new, lr_new, w_star_new = hyperdistill_step(
-            w, lr, w, theta=1.0, gamma=0.99, t=1,
-            train_batch=batch, val_batch=batch,
-            update_fn=_update_fn, loss_val_fn=_loss_fn,
-            lr_hyper=1e-3)
+        opt = OnlineHypergradientOptimizer(
+            update_fn=_update_fn, gamma=0.99, T=5)
+        state = opt.init(w, lr)
+        new_state = opt.step(
+            state, batch, batch,
+            _loss_fn_bilevel, _loss_fn_bilevel, lr_hyper=1e-3)
 
-        # Weights should change
-        assert not jnp.allclose(w_new['w1'], w['w1'])
+        assert not jnp.allclose(new_state.params['w1'], w['w1'])
+        assert new_state.step == 1
 
-    def test_one_step_runs(self):
+    def test_onestep_optimizer_step(self):
         key = jax.random.PRNGKey(42)
         w = _init_model(key)
         lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
         batch = _make_batch(key)
 
-        w_new, lr_new = one_step_step(
-            w, lr, batch, batch,
-            _update_fn, _loss_fn, lr_hyper=1e-3)
+        opt = OneStepOptimizer(update_fn=_update_fn)
+        state = opt.init(w, lr)
+        new_state = opt.step(
+            state, batch, batch,
+            _loss_fn_bilevel, _loss_fn_bilevel, lr_hyper=1e-3)
 
-        assert not jnp.allclose(w_new['w1'], w['w1'])
+        assert not jnp.allclose(new_state.params['w1'], w['w1'])
 
-    def test_fo_step_no_lambda_change_when_no_direct_grad(self):
+    def test_fo_optimizer_no_lambda_change(self):
         key = jax.random.PRNGKey(42)
         w = _init_model(key)
         lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
         batch = _make_batch(key)
 
-        _, lr_new = fo_step(
-            w, lr, batch, batch,
-            _update_fn, _loss_fn, lr_hyper=1e-3,
-            has_direct_grad=False)
+        opt = FOOptimizer(update_fn=_update_fn)
+        state = opt.init(w, lr)
+        new_state = opt.step(
+            state, batch, batch,
+            _loss_fn_bilevel, _loss_fn_bilevel, lr_hyper=1e-3)
 
-        # FO with no direct grad → lambda unchanged
         for l_old, l_new in zip(jax.tree.leaves(lr),
-                                jax.tree.leaves(lr_new)):
+                                jax.tree.leaves(new_state.hyperparams)):
             assert jnp.allclose(l_old, l_new)
+
+    def test_compute_hypergradient(self):
+        key = jax.random.PRNGKey(42)
+        w = _init_model(key)
+        lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
+        batch = _make_batch(key)
+
+        opt = OnlineHypergradientOptimizer(
+            update_fn=_update_fn, gamma=0.99, T=5)
+        state = opt.init(w, lr)
+        state = state.update(step=1)
+
+        hg = opt.compute_hypergradient(
+            state, batch, batch, _loss_fn_bilevel, _loss_fn_bilevel)
+
+        assert tree_l2_norm(hg) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -219,10 +280,12 @@ class TestLinearEstimation:
         batches = [_make_batch(jax.random.fold_in(key, i)) for i in range(T)]
         val_batch = _make_batch(jax.random.PRNGKey(99))
 
-        theta = linear_estimation(
-            w, lr, gamma=0.99,
-            train_batches=batches, val_batch=val_batch,
-            update_fn=_update_fn, loss_val_fn=_loss_fn, T=T)
+        opt = OnlineHypergradientOptimizer(
+            update_fn=_update_fn, gamma=0.99, T=T)
+        state = opt.init(w, lr)
+
+        theta = opt.estimate_theta(
+            state, batches, val_batch, _loss_fn_bilevel, _loss_fn_bilevel)
 
         assert jnp.isfinite(theta), f'theta should be finite, got {theta}'
 
@@ -233,18 +296,19 @@ class TestLinearEstimation:
 
 class TestReproducibility:
     def test_deterministic_with_same_seed(self):
-        """Two runs with the same seed produce identical results."""
         def _run(seed):
             key = jax.random.PRNGKey(seed)
             w = _init_model(key)
             lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
             batch = _make_batch(key)
-            w1, lr1, ws1 = hyperdistill_step(
-                w, lr, w, theta=0.5, gamma=0.99, t=3,
-                train_batch=batch, val_batch=batch,
-                update_fn=_update_fn, loss_val_fn=_loss_fn,
-                lr_hyper=1e-3)
-            return w1, lr1
+
+            opt = OnlineHypergradientOptimizer(
+                update_fn=_update_fn, gamma=0.99, T=5)
+            state = opt.init(w, lr)
+            new_state = opt.step(
+                state, batch, batch,
+                _loss_fn_bilevel, _loss_fn_bilevel, lr_hyper=1e-3)
+            return new_state.params, new_state.hyperparams
 
         w_a, lr_a = _run(42)
         w_b, lr_b = _run(42)
@@ -261,8 +325,6 @@ class TestReproducibility:
 
 class TestHypergradientQuality:
     def test_so_term_aligns_with_finite_diff(self):
-        """The one-step SO term should roughly align with a finite-difference
-        approximation of dL_val(Phi(w,lam;D)) / dlam."""
         key = jax.random.PRNGKey(123)
         w = _init_model(key)
         lr = jax.tree.map(lambda p: jnp.full_like(p, -2.0), w)
@@ -283,7 +345,6 @@ class TestHypergradientQuality:
         so_flat = jnp.concatenate([l.ravel() for l in jax.tree.leaves(so_analytical)])
         fd_flat = jnp.concatenate([l.ravel() for l in jax.tree.leaves(fd_grad)])
 
-        # Check cosine similarity > 0.9
         cos_sim = jnp.dot(so_flat, fd_flat) / (
             jnp.linalg.norm(so_flat) * jnp.linalg.norm(fd_flat) + 1e-10)
         assert float(cos_sim) > 0.9, \

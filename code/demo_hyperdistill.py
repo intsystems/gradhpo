@@ -9,9 +9,9 @@ the model weights).  The inner loop performs SGD with these learned rates,
 and the outer loop uses HyperDistill / baselines to tune them online.
 
 We compare three methods:
-  1. Fixed LR  — no hyperparameter optimisation (baseline).
-  2. 1-step    — one-step lookahead (Luketina et al., 2016).
-  3. HyperDistill — our algorithm (Lee et al., ICLR 2022).
+  1. Fixed LR  -- no hyperparameter optimisation (baseline).
+  2. 1-step    -- one-step lookahead (Luketina et al., 2016).
+  3. HyperDistill -- our algorithm (Lee et al., ICLR 2022).
 
 Usage
 -----
@@ -29,13 +29,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-# ── make the library importable when running from the repo root ──
+# -- make the library importable when running from the repo root --
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from mylib.hyperdistill import (
-    run_hyperdistill,
-    run_baseline,
-    tree_zeros_like,
-)
+from mylib.algorithms.online import OnlineHypergradientOptimizer
+from mylib.algorithms.baselines import OneStepOptimizer
+from mylib.utils.gradients import tree_zeros_like
 
 # ---------------------------------------------------------------------------
 # Simple MLP model (pure JAX, no Flax/Haiku)
@@ -64,11 +62,17 @@ def mlp_forward(params: dict, x: jnp.ndarray) -> jnp.ndarray:
 # ---------------------------------------------------------------------------
 
 def cross_entropy_loss(params: dict, batch: tuple) -> jnp.ndarray:
-    """Softmax cross-entropy loss (scalar)."""
+    """Softmax cross-entropy loss (scalar). Internal helper."""
     x, y = batch
     logits = mlp_forward(params, x)
     log_probs = jax.nn.log_softmax(logits, axis=-1)
     return -jnp.mean(jnp.sum(log_probs * y, axis=-1))
+
+
+def cross_entropy_loss_bilevel(params: dict, hyperparams, batch: tuple) -> jnp.ndarray:
+    """Bilevel-compatible loss: (params, hyperparams, batch) -> scalar.
+    Hyperparams are not used in the loss directly."""
+    return cross_entropy_loss(params, batch)
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +188,7 @@ def main():
 
     key = jax.random.PRNGKey(args.seed)
 
-    # ── Hyperparameters ──
+    # -- Hyperparameters --
     N_FEATURES = 10
     N_CLASSES  = 5
     HIDDEN     = 32
@@ -195,7 +199,7 @@ def main():
     INIT_LR    = 0.05          # initial inner learning rate
     T, M       = args.T, args.M
 
-    # ── Data (shared class centres for train and val) ──
+    # -- Data (shared class centres for train and val) --
     k_centres, k_data, k_model, k_batch = jax.random.split(key, 4)
     centres = make_centres(k_centres, N_FEATURES, N_CLASSES)
     k_train, k_val_data = jax.random.split(k_data)
@@ -212,10 +216,10 @@ def main():
         gv = BatchIterator(X_val, Y_val, BATCH_SIZE, k2)
         return gt, gv
 
-    # ── Model ──
+    # -- Model --
     w_init = init_mlp(k_model, N_FEATURES, HIDDEN, N_CLASSES)
 
-    # Per-parameter LR initialised so that softplus(lr) ≈ INIT_LR
+    # Per-parameter LR initialised so that softplus(lr) ~ INIT_LR
     init_val = float(jnp.log(jnp.exp(INIT_LR) - 1.0))
     lam_init = jax.tree.map(lambda p: jnp.full_like(p, init_val), w_init)
 
@@ -227,44 +231,50 @@ def main():
     print(f'Episodes M={M}, inner steps T={T}, gamma={GAMMA}')
     print()
 
-    # ── 1. Fixed LR ──
+    # -- 1. Fixed LR --
     print('Running Fixed-LR baseline ...')
     gt, gv = make_iterators(100)
     fixed_losses = run_fixed_lr(
         w_init, lam_init, T, M, LR_REPTILE,
         update_fn, gt, gv, X_val, Y_val)
 
-    # ── 2. One-step ──
+    # -- 2. One-step (OOP API) --
     print('Running 1-step baseline ...')
     onestep_losses = []
 
-    def onestep_cb(ep, w, lam, metrics):
-        loss, _ = evaluate(w, X_val, Y_val)
+    def onestep_cb(ep, state):
+        loss, _ = evaluate(state.params, X_val, Y_val)
         onestep_losses.append(loss)
 
     gt, gv = make_iterators(200)
-    run_baseline(
-        w_init, lam_init, T, M, LR_HYPER, LR_REPTILE,
-        update_fn, cross_entropy_loss,
-        gt, gv,
-        method='one_step', callback=onestep_cb)
+    onestep_opt = OneStepOptimizer(update_fn=update_fn)
+    onestep_state = onestep_opt.init(w_init, lam_init)
+    onestep_opt.run(
+        onestep_state, M, T, gt, gv,
+        cross_entropy_loss_bilevel, cross_entropy_loss_bilevel,
+        lr_reptile=LR_REPTILE, lr_hyper=LR_HYPER,
+        callback=onestep_cb)
 
-    # ── 3. HyperDistill ──
+    # -- 3. HyperDistill (OOP API) --
     print('Running HyperDistill ...')
     hd_losses = []
 
-    def hd_cb(ep, w, lam, metrics):
-        loss, _ = evaluate(w, X_val, Y_val)
+    def hd_cb(ep, state):
+        loss, _ = evaluate(state.params, X_val, Y_val)
         hd_losses.append(loss)
 
     gt, gv = make_iterators(300)
-    run_hyperdistill(
-        w_init, lam_init, GAMMA, T, M, LR_HYPER, LR_REPTILE,
-        update_fn, cross_entropy_loss,
-        gt, gv,
-        estimation_period=10, callback=hd_cb)
+    hd_opt = OnlineHypergradientOptimizer(
+        update_fn=update_fn, gamma=GAMMA,
+        estimation_period=10, T=T)
+    hd_state = hd_opt.init(w_init, lam_init)
+    hd_opt.run(
+        hd_state, M, gt, gv,
+        cross_entropy_loss_bilevel, cross_entropy_loss_bilevel,
+        lr_reptile=LR_REPTILE, lr_hyper=LR_HYPER,
+        callback=hd_cb)
 
-    # ── Final evaluation on full val set ──
+    # -- Final evaluation on full val set --
     print()
     print('Final validation (full dataset):')
     for name, losses in [('Fixed LR', fixed_losses),
@@ -275,14 +285,14 @@ def main():
         print(f'  {name:14s}  last-5 avg loss={mean_last5:.4f}  '
               f'best loss={best:.4f}')
 
-    # ── Plot ──
+    # -- Plot --
     if args.plot:
         try:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
         except ImportError:
-            print('matplotlib not installed — skipping plot.')
+            print('matplotlib not installed -- skipping plot.')
             return
 
         def smooth(vals, window=5):
@@ -301,7 +311,7 @@ def main():
                 label='HyperDistill', linewidth=2)
         ax.set_xlabel('Episode')
         ax.set_ylabel('Validation loss (smoothed)')
-        ax.set_title('HyperDistill POC — per-parameter LR optimisation')
+        ax.set_title('HyperDistill POC -- per-parameter LR optimisation')
         ax.legend()
         ax.grid(alpha=0.3)
 
