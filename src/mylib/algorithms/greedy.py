@@ -10,9 +10,9 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 import optax
 
-from gradhpo.core.base import BilevelOptimizer
-from gradhpo.core.state import BilevelState
-from gradhpo.core.types import DataBatch, LossFn, PyTree
+from mylib.core.base import BilevelOptimizer
+from mylib.core.state import BilevelState
+from mylib.core.types import DataBatch, LossFn, PyTree
 
 
 class GreedyOptimizer(BilevelOptimizer):
