@@ -26,6 +26,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install -r src/requirements.txt
           pip install -e ./src
           pip install -r doc/requirements.txt
 
