@@ -35,6 +35,10 @@ Library Planning
 ================
 Can be found `here <https://github.com/intsystems/gradhpo/tree/master/doc/Library_planning.pdf>`_.
 
+Technical Report
+================
+Draft version can be found `here <https://github.com/intsystems/gradhpo/tree/master/doc/tech_report.md>`_.
+
 Software modules developed as part of the study
 ======================================================
 1. A python package gradhpo with all implementation `here <https://github.com/intsystems/gradhpo/tree/master/src>`_.
