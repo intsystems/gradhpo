@@ -36,7 +36,13 @@ The response Jacobian $dw_T / d\lambda$ is computed via the recursive chain rule
 
 $$\frac{dw_T}{d\lambda} = \sum_{t=1}^{T} \left( \prod_{k=t+1}^{T} A_k \right) B_t, \quad A_k = \frac{\partial \Phi(w_{k-1}, \lambda)}{\partial w_{k-1}}, \quad B_t = \frac{\partial \Phi(w_{t-1}, \lambda)}{\partial \lambda}.$$
 
-Computing this exactly requires either storing the full trajectory $w_1, \dots, w_T$ (Reverse-Mode Differentiation, memory $\mathcal{O}(PT)$) or performing $H$ forward passes (Forward-Mode Differentiation, time $\mathcal{O}(HT)$). Both are impractical for large-scale problems. The three methods implemented in GradHPO offer different approximation strategies to make hypergradient computation tractable.
+**The Hessian bottleneck.** When the inner update is a gradient descent step, $\Phi(w, \lambda) = w - \alpha \nabla_w L_{\text{train}}(w, \lambda)$, the matrix $B_t$ becomes a mixed second-order derivative:
+
+$$B_t = \frac{\partial \Phi}{\partial \lambda} = -\alpha \, \nabla^2_{w\lambda} L_{\text{train}}(w_{t-1}, \lambda),$$
+
+i.e., a **Hessian-vector product** (HVP) involving the cross-partial $\nabla^2_{w\lambda} L_{\text{train}}$. This is the fundamental computational obstacle in bilevel optimization: computing or storing the full Hessian costs $\mathcal{O}(PH)$ memory and $\mathcal{O}(PH)$ time per step, which is prohibitive for modern neural networks where $P, H \gg 1$. Similarly, $A_k = I - \alpha \nabla^2_{ww} L_{\text{train}}(w_{k-1}, \lambda)$ involves the parameter-space Hessian, and accumulating the product $\prod_k A_k$ over $T$ steps requires either storing the full trajectory (Reverse-Mode, memory $\mathcal{O}(PT)$) or $H$ forward passes (Forward-Mode, time $\mathcal{O}(HT)$). Both are impractical for large-scale problems.
+
+The three methods implemented in GradHPO offer different strategies to approximate or avoid the Hessian computation entirely, while remaining memory-efficient ($\mathcal{O}(P + H)$) and scalable.
 
 ### 1.3 Overview of Methods
 
