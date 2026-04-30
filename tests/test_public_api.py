@@ -10,11 +10,21 @@ def test_version_string():
 
 def test_top_level_reexports_exist():
     expected = [
-        'BilevelState',
-        'BilevelOptimizer',
+        # Algorithms
         'OnlineHypergradientOptimizer',
+        'T1T2Optimizer',
+        'GreedyOptimizer',
         'FOOptimizer',
         'OneStepOptimizer',
+        # Core
+        'BilevelOptimizer',
+        'BilevelState',
+        'DataBatch',
+        'LossFn',
+        'LossFunctions',
+        'MetricDict',
+        'PyTree',
+        # Utils
         'tree_l2_norm',
         'tree_normalize',
         'tree_dot',
@@ -23,10 +33,15 @@ def test_top_level_reexports_exist():
         'vjp_wrt_lambda',
         'vjp_wrt_both',
         'update_w_star',
-        'LossFunctions',
     ]
     for name in expected:
         assert hasattr(gradhpo, name), f'gradhpo.{name} missing'
+
+
+def test_dunder_all_matches_attributes():
+    """Every name in ``__all__`` must be importable from gradhpo."""
+    for name in gradhpo.__all__:
+        assert hasattr(gradhpo, name), f'__all__ lists missing {name}'
 
 
 def test_loss_functions_namedtuple():
