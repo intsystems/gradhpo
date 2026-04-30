@@ -121,3 +121,8 @@ logs/
 */mnist
 *.csv
 !.dvc
+# Whitelist project-level dotfiles needed by tooling / CI:
+!.gitignore
+!.flake8
+!.github
+!.github/**

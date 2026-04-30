@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 100
+extend-exclude =
+    doc/build,
+    .pytest_cache,
+    build,
+    dist,
+    *.egg-info
+# E203: whitespace before ':' — conflicts with PEP-8 slicing recommendation
+# W503: line break before binary operator — modern PEP-8 prefers this
+# E741: 'l' as a name — used as a tree-leaf symbol in JAX-flavoured code
+extend-ignore = E203, W503, E741
+per-file-ignores =
+    # __init__.py re-exports are intentional public-API surfaces
+    src/gradhpo/__init__.py:F401
+    src/gradhpo/core/__init__.py:F401
+    src/gradhpo/algorithms/__init__.py:F401
+    src/gradhpo/utils/__init__.py:F401
