@@ -2,9 +2,9 @@
 API Reference
 ==============
 
-Библиотека организована в три модуля: ядро (типы, состояние, базовый класс),
-реализации алгоритмов и вспомогательные утилиты для работы с pytree
-и гиперградиентами.
+The library is organized into three modules: core (types, state, base class),
+algorithm implementations, and utility functions for pytree operations
+and hypergradient computation.
 
 .. toctree::
    :maxdepth: 2

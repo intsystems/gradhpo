@@ -2,7 +2,7 @@
 Utils (``utils``)
 ===================
 
-Утилиты для работы с JAX pytree и вычисления гиперградиентов.
+Utility functions for JAX pytree operations and hypergradient computation.
 
 .. automodule:: gradhpo.utils.gradients
    :members:

@@ -2,24 +2,24 @@
 Core (``core``)
 ==================
 
-Типы данных
------------
+Types
+-----
 
 .. automodule:: gradhpo.core.types
    :members:
    :undoc-members:
    :show-inheritance:
 
-Состояние оптимизации
----------------------
+Optimization State
+------------------
 
 .. automodule:: gradhpo.core.state
    :members:
    :undoc-members:
    :show-inheritance:
 
-Базовый оптимизатор
--------------------
+Base Optimizer
+--------------
 
 .. automodule:: gradhpo.core.base
    :members:

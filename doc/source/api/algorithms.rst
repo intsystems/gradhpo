@@ -26,7 +26,7 @@ GreedyOptimizer
    :undoc-members:
    :show-inheritance:
 
-Бейзлайны
+Baselines
 ---------
 
 .. automodule:: gradhpo.algorithms.baselines

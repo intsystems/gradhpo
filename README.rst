@@ -15,9 +15,9 @@
 
 .. class:: center
 
-    :Название исследуемой задачи: Short-Horizon Gradient-Based Hyperparameter Optimization
-    :Тип научной работы: Research Project
-    :Авторы: Eynullayev Altay, Rubtsov Denis, Karpeev Gleb
+    :Research Topic: Short-Horizon Gradient-Based Hyperparameter Optimization
+    :Type of Work: Research Project
+    :Authors: Eynullayev Altay, Rubtsov Denis, Karpeev Gleb
 
 Abstract
 ========

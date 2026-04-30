@@ -18,7 +18,7 @@ def get_version():
 
 
 readme = read('README.rst')
-# вычищаем локальные версии из файла requirements (согласно PEP440)
+# Strip local version specifiers from requirements file (per PEP 440)
 requirements = '\n'.join(
     re.findall(r'^([^\s^+]+).*$',
                read('requirements.txt'),
