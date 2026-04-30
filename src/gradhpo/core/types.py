@@ -5,7 +5,6 @@ Provides type aliases and data structures used across all algorithms.
 
 from typing import Any, Callable, Dict, NamedTuple, Union
 
-import jax.numpy as jnp
 from jax import Array
 
 # Type aliases

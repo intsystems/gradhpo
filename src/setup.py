@@ -1,10 +1,23 @@
+"""Setup script for the gradhpo package.
+
+Layout: this file lives in src/, the importable package is src/gradhpo.
+Build with ``python -m pip install ./src`` from the repository root, or
+``python -m pip install .`` from inside src/.
+"""
+
 import io
+import os
 import re
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
+
+
+HERE = os.path.abspath(os.path.dirname(__file__))
 
 
 def read(file_path):
-    with io.open(file_path, 'r', encoding='utf-8') as f:
+    """Read a UTF-8 text file relative to this setup.py."""
+    with io.open(os.path.join(HERE, file_path), 'r', encoding='utf-8') as f:
         return f.read()
 
 
@@ -30,10 +43,36 @@ setup(
     version=get_version(),
     license='MIT',
     author='Eynullayev A., Rubtsov D., Karpeev G.',
-    author_email="grabovoy.av@phystech.edu",
-    description='GradHpO: gradient-based hyperparameter optimization in JAX',
-    long_description=readme,
-    url='https://github.com/intsystems/GradHpO',
-    packages=find_packages(),
-    install_requires=requirements,
+    author_email='karpeev.ga@phystech.edu',
+    description=(
+        'gradhpo: gradient-based hyperparameter optimization in JAX. '
+        'Implements T1-T2/DARTS, Greedy and HyperDistill bilevel algorithms.'
+    ),
+    long_description=read('README.rst'),
+    long_description_content_type='text/x-rst',
+    url='https://github.com/intsystems/gradhpo',
+    project_urls={
+        'Source': 'https://github.com/intsystems/gradhpo',
+        'Documentation': 'https://intsystems.github.io/gradhpo/',
+        'Tracker': 'https://github.com/intsystems/gradhpo/issues',
+    },
+    packages=find_packages(exclude=('tests', 'tests.*')),
+    install_requires=get_requirements(),
+    python_requires='>=3.9',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    ],
+    keywords=(
+        'hyperparameter-optimization bilevel-optimization '
+        'jax meta-learning hypergradient'
+    ),
 )

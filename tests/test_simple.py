@@ -1,14 +1,17 @@
 from gradhpo.train import cv_parameters, Trainer, SyntheticBernuliDataset
 from sklearn.linear_model import LogisticRegression
 
+from gradhpo.train import Trainer, SyntheticBernuliDataset, cv_parameters
+
+
 def test_sample():
     assert 0 == 0
 
 
 def test_dataset():
     dataset = SyntheticBernuliDataset(n=10, m=100, seed=42)
-
     assert len(dataset.X) == len(dataset.y)
+
 
 def test_trainer():
     dataset = SyntheticBernuliDataset(n=10, m=100, seed=42)
@@ -18,12 +21,12 @@ def test_trainer():
         dataset.X, dataset.y,
     )
     trainer.train()
-    
-    assert trainer.eval(output_dict=True)['accuracy'] == 0.96
 
+    assert trainer.eval(output_dict=True)['accuracy'] == 0.96
     assert trainer.test(
-        trainer.X_val, trainer.Y_val, output_dict=True
-        )['accuracy'] == 0.96
+        trainer.X_val, trainer.Y_val, output_dict=True,
+    )['accuracy'] == 0.96
+
 
 def test_cv():
     dataset = SyntheticBernuliDataset(n=10, m=100, seed=42)

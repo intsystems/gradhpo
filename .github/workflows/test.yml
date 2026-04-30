@@ -22,11 +22,11 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install -U pytest pytest-cov
-          pip install -U -r src/requirements.txt
+          pip install -e ./src
 
       - name: Testing
         run: |
-          PYTHONPATH=src/ pytest tests/ --cov=mylib --cov-report=xml
+          pytest tests/ --cov=gradhpo --cov-report=xml --cov-report=term-missing
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4

@@ -27,10 +27,10 @@ from gradhpo.utils.gradients import (
 
 class T1T2Optimizer(BilevelOptimizer):
     """T1-T2 optimizer with numerical DARTS approximation.
-    
+
     Implements the T1-T2 algorithm with a fixed horizon length and uses
     numerical DARTS approximation for computing the hypergradient.
-    
+
     Attributes:
         inner_optimizer: Optax optimizer for parameters (optional if update_fn given).
         outer_optimizer: Optax optimizer for hyperparameters (optional).
@@ -50,7 +50,7 @@ class T1T2Optimizer(BilevelOptimizer):
         eps: float = 1e-4,
     ):
         """Initialize T1-T2 optimizer with numerical DARTS approximation.
-        
+
         Args:
             inner_optimizer: Optax optimizer for parameters.
             outer_optimizer: Optax optimizer for hyperparameters.
@@ -70,7 +70,7 @@ class T1T2Optimizer(BilevelOptimizer):
         self, state: BilevelState, train_loss_fn: LossFn,
     ) -> Callable:
         """Return the inner step function Phi(w, lam, batch) -> w_new.
-        
+
         If a custom update_fn was provided, use it directly.
         Otherwise, build one from train_loss_fn + inner_optimizer.
         """
@@ -93,11 +93,11 @@ class T1T2Optimizer(BilevelOptimizer):
         hyperparams: PyTree,
     ) -> BilevelState:
         """Initialize state with hypergradient memory.
-        
+
         Args:
             params: Initial model parameters.
             hyperparams: Initial hyperparameters.
-            
+
         Returns:
             Initial BilevelState.
         """
@@ -132,17 +132,17 @@ class T1T2Optimizer(BilevelOptimizer):
         val_loss_fn: LossFn,
     ) -> PyTree:
         """Compute hypergradient w.r.t. hyperparameters using numerical DARTS approximation.
-        
-        Uses the T1-T2 approximation with numerical DARTS: 
+
+        Uses the T1-T2 approximation with numerical DARTS:
         g = g_FO + sum_{t=1}^T (alpha_t @ dPhi(w_{t-1}, lam; D_t) / dlam)
-        
+
         Args:
             state: Current state (must have w_star in metadata).
             train_batch: Training batch.
             val_batch: Validation batch.
             train_loss_fn: Training loss function.
             val_loss_fn: Validation loss function.
-            
+
         Returns:
             Hypergradient with same structure as hyperparams.
         """
@@ -180,58 +180,47 @@ class T1T2Optimizer(BilevelOptimizer):
         alpha: PyTree,
     ) -> PyTree:
         """Compute alpha @ dPhi/dlambda using numerical DARTS approximation.
-        
+
         Uses finite differences to approximate the derivative:
         dPhi/dlambda ≈ [Phi(w, lam + eps*e_i, batch) - Phi(w, lam - eps*e_i, batch)] / (2*eps)
-        
+
         Args:
             phi_fn: Inner step function Phi(w, lam, batch) -> w_new.
             w: Model parameters.
             lam: Hyperparameters.
             batch: Training batch.
             alpha: Gradient vector for VJP computation.
-            
+
         Returns:
             alpha @ dPhi/dlambda computed via numerical approximation.
         """
-        # Flatten hyperparameters for element-wise perturbation
         flat_lam, tree_def = jax.tree_util.tree_flatten(lam)
-        
-        # Initialize result with zeros of the same structure as lam
         result_leaves = []
-        
-        # For each element in the flattened hyperparameters, compute finite difference
+
         for i, lam_element in enumerate(flat_lam):
-            # Create perturbation vector (only i-th element is non-zero)
-            perturbation_shape = lam_element.shape
-            perturbation = jnp.zeros(perturbation_shape)
-            
-            # Compute gradient for this element using finite differences
+            shape_i = lam_element.shape
+
             def compute_element_gradient(pert_val):
-                # Create perturbed hyperparameters
                 perturbed_lam_leaves = [
-                    leaf + (pert_val * jnp.ones(leaf.shape) if j == i else jnp.zeros(leaf.shape))
+                    leaf + (
+                        pert_val * jnp.ones(leaf.shape)
+                        if j == i else jnp.zeros(leaf.shape)
+                    )
                     for j, leaf in enumerate(flat_lam)
                 ]
-                perturbed_lam = jax.tree_util.tree_unflatten(tree_def, perturbed_lam_leaves)
-                
-                # Compute Phi with perturbed hyperparameters
+                perturbed_lam = jax.tree_util.tree_unflatten(
+                    tree_def, perturbed_lam_leaves)
                 w_new = phi_fn(w, perturbed_lam, batch)
-                
-                # Compute dot product with alpha
                 return tree_dot(w_new, alpha)
-            
-            # Use central difference approximation
-            # (f(x+eps) - f(x-eps)) / (2*eps)
+
+            # Central difference: (f(x+eps) - f(x-eps)) / (2*eps).
             f_plus = compute_element_gradient(self.eps)
             f_minus = compute_element_gradient(-self.eps)
             gradient_element = (f_plus - f_minus) / (2 * self.eps)
-            
-            result_leaves.append(gradient_element * jnp.ones(perturbation_shape))
-        
-        # Reconstruct the tree structure
-        result = jax.tree_util.tree_unflatten(tree_def, result_leaves)
-        return result
+
+            result_leaves.append(gradient_element * jnp.ones(shape_i))
+
+        return jax.tree_util.tree_unflatten(tree_def, result_leaves)
 
     @partial(jax.jit, static_argnums=(0, 4, 5, 6))
     def step(
@@ -244,7 +233,7 @@ class T1T2Optimizer(BilevelOptimizer):
         lr_hyper: Optional[float] = None,
     ) -> BilevelState:
         """Perform one T1-T2 optimization step with numerical DARTS approximation.
-        
+
         Args:
             state: Current bilevel state.
             train_batch: Training data batch.
@@ -252,7 +241,7 @@ class T1T2Optimizer(BilevelOptimizer):
             train_loss_fn: Training loss function.
             val_loss_fn: Validation loss function.
             lr_hyper: Manual learning rate (used when outer_optimizer is None).
-            
+
         Returns:
             Updated state.
         """
@@ -323,9 +312,9 @@ class T1T2Optimizer(BilevelOptimizer):
         callback: Optional[Callable] = None,
     ) -> BilevelState:
         """Full T1-T2 training loop.
-        
+
         Runs M episodes, each with T inner steps and a Reptile update.
-        
+
         Args:
             state: Initial state (from init()).
             M: Number of outer episodes.
@@ -336,7 +325,7 @@ class T1T2Optimizer(BilevelOptimizer):
             lr_reptile: Reptile learning rate for weight initialization.
             lr_hyper: Manual hyper LR (used when outer_optimizer is None).
             callback: Optional callback(episode, state).
-            
+
         Returns:
             Final BilevelState.
         """

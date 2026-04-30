@@ -72,6 +72,10 @@ napoleon_use_admonition_for_examples = True
 napoleon_use_admonition_for_notes = True
 napoleon_use_param = True
 napoleon_use_rtype = True
+# Render ``Attributes:`` blocks as ``:ivar:`` fields rather than nested
+# ``.. attribute::`` directives — avoids duplicate-object warnings when
+# autodoc also picks up the dataclass fields.
+napoleon_use_ivar = True
 
 # ============================================================================
 # HTML Theme Configuration
@@ -111,4 +115,7 @@ intersphinx_mapping = {
 
 suppress_warnings = [
     'app.add_config_value',
+    # ``references.rst`` is a bibliography page; entries are intentionally not
+    # cross-referenced from the rest of the docs.
+    'ref.citation',
 ]
