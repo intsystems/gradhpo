@@ -1,8 +1,12 @@
-|test| |codecov| |docs| |pypi| |license|
+|test| |lint| |codecov| |docs| |pypi| |license|
 
 .. |test| image:: https://github.com/intsystems/gradhpo/workflows/test/badge.svg
     :target: https://github.com/intsystems/gradhpo/actions/workflows/test.yml
     :alt: Test status
+
+.. |lint| image:: https://github.com/intsystems/gradhpo/workflows/lint/badge.svg
+    :target: https://github.com/intsystems/gradhpo/actions/workflows/lint.yml
+    :alt: PEP-8 (flake8)
 
 .. |codecov| image:: https://img.shields.io/codecov/c/github/intsystems/gradhpo/master
     :target: https://app.codecov.io/gh/intsystems/gradhpo
