@@ -1,4 +1,3 @@
-from gradhpo.train import cv_parameters, Trainer, SyntheticBernuliDataset
 from sklearn.linear_model import LogisticRegression
 
 from gradhpo.train import Trainer, SyntheticBernuliDataset, cv_parameters

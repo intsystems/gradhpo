@@ -21,8 +21,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -U pytest pytest-cov
+          pip install -U pytest pytest-cov flake8
           pip install -e ./src
+
+      - name: Lint (flake8)
+        run: flake8 src/gradhpo tests
 
       - name: Testing
         run: |

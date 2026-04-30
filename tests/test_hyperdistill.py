@@ -3,25 +3,20 @@
 import jax
 import jax.numpy as jnp
 import pytest
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from gradhpo.core.state import BilevelState
-from gradhpo.core.types import DataBatch, LossFunctions, PyTree, LossFn
-from gradhpo.algorithms.online import OnlineHypergradientOptimizer
 from gradhpo.algorithms.baselines import FOOptimizer, OneStepOptimizer
+from gradhpo.algorithms.online import OnlineHypergradientOptimizer
 from gradhpo.algorithms.t1t2 import T1T2Optimizer
+from gradhpo.core.state import BilevelState
 from gradhpo.utils.gradients import (
-    tree_l2_norm,
-    tree_normalize,
     tree_dot,
-    tree_zeros_like,
+    tree_l2_norm,
     tree_lerp,
-    vjp_wrt_lambda,
-    vjp_wrt_both,
+    tree_normalize,
+    tree_zeros_like,
     update_w_star,
+    vjp_wrt_both,
+    vjp_wrt_lambda,
 )
 
 

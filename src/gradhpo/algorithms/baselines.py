@@ -4,16 +4,12 @@ from functools import partial
 from typing import Any, Callable, Optional
 
 import jax
-import jax.numpy as jnp
 import optax
 
 from gradhpo.core.base import BilevelOptimizer
 from gradhpo.core.state import BilevelState
-from gradhpo.core.types import PyTree, LossFn
-from gradhpo.utils.gradients import (
-    tree_zeros_like,
-    vjp_wrt_lambda,
-)
+from gradhpo.core.types import LossFn, PyTree
+from gradhpo.utils.gradients import vjp_wrt_lambda
 
 
 class FOOptimizer(BilevelOptimizer):

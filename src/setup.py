@@ -30,12 +30,15 @@ def get_version():
     raise RuntimeError("Unable to find __version__ in gradhpo/__init__.py")
 
 
-readme = read('README.rst')
-# Strip local version specifiers from requirements file (per PEP 440)
-requirements = '\n'.join(
-    re.findall(r'^([^\s^+]+).*$',
-               read('requirements.txt'),
-               flags=re.MULTILINE))
+def get_requirements():
+    """Parse requirements.txt, dropping comments and blank lines."""
+    out = []
+    for line in read('requirements.txt').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        out.append(re.match(r'^([^\s#]+)', line).group(1))
+    return out
 
 
 setup(

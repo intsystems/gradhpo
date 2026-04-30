@@ -35,10 +35,12 @@ class SyntheticBernuliDataset(object):
         """
         rs = numpy.random.RandomState(seed)
 
-        self.w = rs.randn(n) # Sample parameter vector from standard normal distribution
-        self.X = rs.randn(m, n) # Sample feature vectors from standard normal distribution
-
-        self.y = rs.binomial(1, expit(self.X@self.w)) # Data generating process: binary labels from Bernoulli scheme
+        # Parameter vector drawn from a standard normal distribution.
+        self.w = rs.randn(n)
+        # Feature matrix drawn from a standard normal distribution.
+        self.X = rs.randn(m, n)
+        # Targets follow a Bernoulli scheme on the linear logits.
+        self.y = rs.binomial(1, expit(self.X @ self.w))
 
 
 class Trainer(object):

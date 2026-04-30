@@ -4,7 +4,7 @@ Implements the T1-T2 algorithm from Luketina et al. (2016) with numerical
 DARTS approximation as described in Liu et al. (2018).
 """
 from functools import partial
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Optional
 
 import jax
 import jax.numpy as jnp
@@ -13,16 +13,7 @@ import optax
 from gradhpo.core.base import BilevelOptimizer
 from gradhpo.core.state import BilevelState
 from gradhpo.core.types import PyTree, LossFn
-from gradhpo.utils.gradients import (
-    tree_zeros_like,
-    tree_l2_norm,
-    tree_normalize,
-    tree_dot,
-    tree_lerp,
-    vjp_wrt_lambda,
-    vjp_wrt_both,
-    update_w_star,
-)
+from gradhpo.utils.gradients import tree_dot, update_w_star
 
 
 class T1T2Optimizer(BilevelOptimizer):

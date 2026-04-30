@@ -4,7 +4,7 @@ Implements online hyperparameter meta-learning with hypergradient distillation.
 """
 
 from functools import partial
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional
 
 import jax
 import jax.numpy as jnp
