@@ -356,14 +356,6 @@ The notebook `code/demo_methods.ipynb` provides five self-contained demonstratio
 
 The final section of the notebook runs all five optimizers plus a fixed-learning-rate baseline on the per-parameter LR task and plots their smoothed validation loss curves on a single figure. The comparison allows direct visual assessment of convergence speed and final validation loss across methods.
 
-**Figure 1** below shows the expected output of the comparison cell (Section 6 of the notebook). The plot displays smoothed validation loss (window $w = 5$) over 60 outer episodes for six curves: Fixed LR, FO, OneStep, HyperDistill, T1–T2, and Greedy.
-
-> **[Figure 1: Comparison of all methods — smoothed validation loss vs. outer episode]**
->
-> *(Run `code/demo_methods.ipynb`, Section 6 to generate this figure.)*
->
-> ![Comparison plot placeholder](../figures/demo_methods_comparison.png)
-
 ### 7.4 Key Observations
 
 Based on the experimental setup, the following qualitative behaviors are expected:
