@@ -1,6 +1,6 @@
 """Utility functions for gradient computation and pytree operations."""
 
-from mylib.utils.gradients import (
+from gradhpo.utils.gradients import (
     tree_l2_norm,
     tree_normalize,
     tree_dot,

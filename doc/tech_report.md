@@ -6,7 +6,7 @@
 
 ## Abstract
 
-Bilevel optimization is a foundational framework for hyperparameter optimization, meta-learning, and neural architecture search. Computing exact hypergradients is computationally prohibitive, motivating a family of approximation methods that trade off accuracy, memory, and scalability. This report presents **GradHPO** (`mylib`), a JAX-based Python library that provides unified, composable implementations of three gradient-based hyperparameter optimization algorithms: (1) **Online Hyperparameter Meta-Learning with Hypergradient Distillation** (HyperDistill), (2) the **T1–T2 method with numerical DARTS approximation**, and (3) **Generalized Greedy Gradient-based optimization**. We describe the theoretical foundations of each method, discuss the library's architecture and key design decisions, and outline the software stack.
+Bilevel optimization is a foundational framework for hyperparameter optimization, meta-learning, and neural architecture search. Computing exact hypergradients is computationally prohibitive, motivating a family of approximation methods that trade off accuracy, memory, and scalability. This report presents **GradHPO** (`gradhpo`), a JAX-based Python library that provides unified, composable implementations of three gradient-based hyperparameter optimization algorithms: (1) **Online Hyperparameter Meta-Learning with Hypergradient Distillation** (HyperDistill), (2) the **T1–T2 method with numerical DARTS approximation**, and (3) **Generalized Greedy Gradient-based optimization**. We describe the theoretical foundations of each method, discuss the library's architecture and key design decisions, and outline the software stack.
 
 ---
 
@@ -214,10 +214,10 @@ Experiments on toy problems, data hyper-cleaning (MNIST, Fashion-MNIST), and few
 
 ### 6.1 Overview
 
-GradHPO is organized as a Python package (`mylib`) with a modular architecture that separates core abstractions from algorithm implementations and utility functions:
+GradHPO is organized as a Python package (`gradhpo`) with a modular architecture that separates core abstractions from algorithm implementations and utility functions:
 
 ```
-src/mylib/
+src/gradhpo/
 ├── __init__.py          # Public API exports
 ├── train.py             # Training utilities
 ├── core/
@@ -244,11 +244,14 @@ The `BilevelState` dataclass is the central state container, holding all quantit
 
 - **`params`** (`PyTree`): Current model parameters $w_t$.
 - **`hyperparams`** (`PyTree`): Current hyperparameters $\lambda$.
-- **`inner_step`** (`int`): Current inner iteration counter.
-- **`outer_step`** (`int`): Current outer iteration counter.
-- **`metrics`** (`dict`): Accumulated metrics (losses, gradient norms, etc.).
+- **`inner_opt_state`** (`OptState`): State of the inner optimizer (e.g., Adam momentum buffers).
+- **`outer_opt_state`** (`OptState`): State of the outer optimizer used for hyperparameter updates.
+- **`step`** (`int`): Current optimization step counter.
+- **`metadata`** (`dict`): Auxiliary information (losses, gradient norms, etc.) accumulated during training.
 
 The state is immutable — each `step()` call returns a new `BilevelState` rather than mutating in place. This design is essential for compatibility with JAX's functional transformation model (`jax.jit`, `jax.grad`, `jax.vmap`).
+
+`BilevelState` is registered as a **JAX pytree** via `jax.tree_util.register_pytree_node`. The pytree leaves are `params`, `hyperparams`, `inner_opt_state`, `outer_opt_state`, and the *values* of `metadata` (in sorted-key order). The aux data (treated as static by JAX) consists of `step` and the sorted `metadata` keys. This registration is required for `BilevelState` instances to be passed through `jax.jit`-compiled functions.
 
 #### BilevelOptimizer (Abstract Base Class)
 
@@ -262,24 +265,25 @@ This abstraction allows users to swap between optimization algorithms with minim
 
 #### Type Definitions
 
-The library defines several core types for clarity and type safety:
+The library defines several core types in `core/types.py` for clarity and type safety:
 
-- **`PyTree`**: JAX pytree (nested structure of arrays) — used for both parameters and hyperparameters.
-- **`LossFn`**: Callable `(params, hyperparams, batch) → scalar` — the loss function signature.
-- **`DataBatch`**: Named tuple with `inputs` and `targets` fields.
-- **`LossFunctions`**: Named tuple bundling `train_loss` and `val_loss`.
+- **`PyTree`**: Type alias for `Any` — JAX pytree (nested structure of arrays), used for both parameters and hyperparameters.
+- **`LossFn`**: `Callable[[PyTree, PyTree, Any], Array]` — the universal loss function signature `(params, hyperparams, batch) → scalar`.
+- **`MetricDict`**: `Dict[str, Union[float, Array]]` — dictionary of scalar metrics.
+- **`DataBatch`**: `NamedTuple` with `inputs` and `targets` fields — convenience wrapper for a data batch.
+- **`LossFunctions`**: `NamedTuple` bundling `train_loss` and `val_loss` callables.
 
 ### 6.3 Algorithm Implementations
 
 Each optimizer class encapsulates its specific hypergradient computation logic while sharing the common `BilevelOptimizer` interface:
 
-- **`OnlineHypergradientOptimizer`** (421 lines): Implements the full HyperDistill algorithm including distilled weight point EMA, linear scaling estimator with periodic $\theta$ fitting, and optional Reptile weight initialization.
+- **`OnlineHypergradientOptimizer`** (`online.py`, 422 lines): Implements the full HyperDistill algorithm including distilled weight point EMA, linear scaling estimator with periodic $\theta$ fitting, and optional Reptile weight initialization.
 
-- **`T1T2Optimizer`** (379 lines): Implements T1–T2 with numerical DARTS finite-difference approximation. The `_numerical_darts_approximation` method perturbs each hyperparameter element by $\pm\epsilon$ and computes the Jacobian-vector product via central differences.
+- **`T1T2Optimizer`** (`t1t2.py`, 379 lines): Implements T1–T2 with numerical DARTS finite-difference approximation. The `_numerical_darts_approximation` method perturbs each hyperparameter element by $\pm\epsilon$ and computes the Jacobian-vector product via central differences.
 
-- **`GreedyOptimizer`** (279 lines): Implements the Generalized Greedy method with configurable $\gamma$ decay. The `_rollout` method performs $T$ inner steps, and `_compute_hypergradient_from_rollout` accumulates the weighted greedy gradients.
+- **`GreedyOptimizer`** (`greedy.py`, 341 lines): Implements the Generalized Greedy method with configurable $\gamma$ decay. The `_rollout` method performs $T$ inner steps using an Optax inner optimizer, and `_compute_hypergradient_from_rollout` accumulates the weighted greedy gradients. Unlike the other optimizers, `GreedyOptimizer` accepts Optax optimizer objects (`inner_optimizer`, `outer_optimizer`) directly rather than a custom `update_fn`.
 
-- **`FOOptimizer`** and **`OneStepOptimizer`** (317 lines combined): Baseline implementations. `FOOptimizer` uses only the first-order term $g_{\text{FO}}$, while `OneStepOptimizer` implements the original T1–T2 without the DARTS approximation.
+- **`FOOptimizer`** and **`OneStepOptimizer`** (`baselines.py`, 321 lines combined): Baseline implementations. `FOOptimizer` uses only the first-order term $g_{\text{FO}}$, while `OneStepOptimizer` implements the original T1–T2 without the DARTS approximation. Both use a Reptile-style outer loop in `run()` that accepts an explicit inner-step count `T`.
 
 ### 6.4 Utility Functions
 
@@ -306,22 +310,74 @@ The `utils/gradients.py` module provides essential building blocks:
 The choice of **JAX** as the autodiff backend is central to the library's design. JAX's functional programming model — where transformations like `jax.grad`, `jax.jit`, and `jax.vmap` compose cleanly — aligns naturally with the bilevel optimization workflow. In particular:
 
 - **`jax.grad`** and **`jax.vjp`** enable efficient computation of the VJPs needed for hypergradient estimation.
-- **`jax.jit`** compiles the inner loop and hypergradient computation for GPU/TPU acceleration.
+- **`jax.jit`** compiles each `step()` method for GPU/TPU acceleration. All five optimizer classes have `@partial(jax.jit, static_argnums=(0, 4, 5, 6))` on their `step()` methods, marking `self`, `train_loss_fn`, `val_loss_fn`, and `lr_hyper` as static (non-traced) arguments.
 - The **pytree** abstraction allows parameters and hyperparameters to be arbitrary nested structures (dicts, lists, named tuples), which is essential for real neural network architectures.
 
 **Optax** provides a clean API for composing gradient transformations (e.g., Adam with gradient clipping and learning rate decay), which is used for both inner and outer optimization loops.
 
 ---
 
-## 7. Conclusion
+## 7. Baseline Experiments (`demo_methods.ipynb`)
 
-GradHPO provides a unified, JAX-native implementation of three complementary approaches to gradient-based hyperparameter optimization. The methods span a spectrum of approximation strategies:
+### 7.1 Overview
+
+The notebook `code/demo_methods.ipynb` provides five self-contained demonstrations of the library's algorithms on a shared synthetic classification task. All demos use the same data-generating process: a 10-class Gaussian mixture model with 10-dimensional features, a two-layer MLP (hidden size 32), and mini-batches of 128 samples.
+
+**Shared experimental setup:**
+
+| Parameter | Value |
+|---|---|
+| Features / classes | 10 / 5 |
+| Hidden units | 32 |
+| Batch size | 128 |
+| Outer episodes $M$ | 60 |
+| Inner steps per episode $T$ | 20 |
+| Reptile step size $\eta_r$ | 1.0 |
+
+### 7.2 Demo Descriptions
+
+**Demo 1 — HyperDistill (`OnlineHypergradientOptimizer`):** Optimizes per-parameter learning rates (one scalar per weight tensor) on the classification task. The hyperparameter vector $\lambda \in \mathbb{R}^P$ is initialized to $\log(\exp(0.05) - 1)$ (softplus-inverse of 0.05) and updated online at every inner step with $\gamma = 0.99$, $\eta_\lambda = 3 \times 10^{-3}$.
+
+**Demo 2 — One-Step Lookahead (`OneStepOptimizer`):** Optimizes a scalar L2 regularization coefficient $\lambda \in \mathbb{R}$ on the same task. The effective regularization strength is $\text{softplus}(\lambda)$, ensuring positivity. The hypergradient is computed via a single inner step without the DARTS approximation.
+
+**Demo 3 — First-Order Baseline (`FOOptimizer`):** Demonstrates data hyper-cleaning: per-sample weights $\lambda \in \mathbb{R}^{N_{\text{train}}}$ are optimized to down-weight noisy training examples (30% label noise). The effective weight for sample $i$ is $\sigma(\lambda_i)$. The FO baseline ignores the second-order term entirely.
+
+**Demo 4 — T1–T2 (`T1T2Optimizer`):** Same per-parameter learning rate task as Demo 1, using the numerical DARTS approximation for the second-order term. Hyperparameters: $\gamma = 0.9$, $T = 20$, $\eta_\lambda = 3 \times 10^{-3}$.
+
+**Demo 5 — Generalized Greedy (`GreedyOptimizer`):** Same per-parameter learning rate task, using the discount-weighted sum of greedy gradients over the unrolled inner trajectory. Uses Optax SGD as the inner optimizer and Optax Adam as the outer optimizer, with $\gamma = 0.9$ and `unroll_steps` = $T$.
+
+### 7.3 Comparison (Demo 6)
+
+The final section of the notebook runs all five optimizers plus a fixed-learning-rate baseline on the per-parameter LR task and plots their smoothed validation loss curves on a single figure. The comparison allows direct visual assessment of convergence speed and final validation loss across methods.
+
+**Figure 1** below shows the expected output of the comparison cell (Section 6 of the notebook). The plot displays smoothed validation loss (window $w = 5$) over 60 outer episodes for six curves: Fixed LR, FO, OneStep, HyperDistill, T1–T2, and Greedy.
+
+> **[Figure 1: Comparison of all methods — smoothed validation loss vs. outer episode]**
+>
+> *(Run `code/demo_methods.ipynb`, Section 6 to generate this figure.)*
+>
+> ![Comparison plot placeholder](../figures/demo_methods_comparison.png)
+
+### 7.4 Key Observations
+
+Based on the experimental setup, the following qualitative behaviors are expected:
+
+- **HyperDistill** and **Greedy** benefit from accumulating long-horizon gradient information ($\gamma = 0.99$ and $0.9$ respectively) and are expected to converge to lower validation loss than the single-step methods.
+- **T1–T2** (single-step, DARTS approximation) and **OneStep** (single-step, exact VJP) should behave similarly, with T1–T2 potentially more stable due to the finite-difference smoothing.
+- **FO baseline** ignores the second-order term and is expected to converge more slowly or to a worse optimum on tasks where the hyperparameter has a strong indirect effect on the validation loss.
+- **Fixed LR** serves as a non-adaptive lower bound.
+
+---
+
+## 8. Conclusion
+
+GradHPO provides a unified, JAX-native implementation of three complementary approaches to gradient-based hyperparameter optimization, together with two first-order baselines. The methods span a spectrum of approximation strategies:
 
 - **HyperDistill** offers the most sophisticated approximation with online updates and constant-cost hypergradient estimation, at the expense of additional hyperparameters ($\gamma$, $\theta$).
 - **T1–T2 + DARTS** provides the simplest and cheapest approximation (one JVP, no trajectory storage), suitable when short-horizon bias is acceptable.
 - **Generalized Greedy** strikes a middle ground, accumulating information from the full trajectory with a tunable decay parameter $\gamma$ and provable descent guarantees.
 
-The library's modular design — with a shared `BilevelOptimizer` interface, immutable `BilevelState`, and JAX-compatible functional style — makes it straightforward to experiment with different methods and extend the framework with new algorithms.
+The library's modular design — with a shared `BilevelOptimizer` interface, immutable `BilevelState` registered as a JAX pytree, JIT-compiled `step()` methods, and JAX-compatible functional style — makes it straightforward to experiment with different methods and extend the framework with new algorithms. The `demo_methods.ipynb` notebook provides ready-to-run demonstrations of all five algorithms on synthetic tasks, enabling direct comparison of convergence behavior.
 
 ---
 

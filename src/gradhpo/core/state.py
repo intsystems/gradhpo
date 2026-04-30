@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import jax
 
-from mylib.core.types import PyTree
+from gradhpo.core.types import PyTree
 
 OptState = Any  # optax optimizer state or None
 

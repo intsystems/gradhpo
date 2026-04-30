@@ -9,12 +9,12 @@ def read(file_path):
 
 
 def get_version():
-    """Read __version__ from mylib/__init__.py without importing the package."""
-    content = read('mylib/__init__.py')
+    """Read __version__ from gradhpo/__init__.py without importing the package."""
+    content = read('gradhpo/__init__.py')
     match = re.search(r"^__version__\s*=\s*['\"]([^'\"]+)['\"]", content, re.MULTILINE)
     if match:
         return match.group(1)
-    raise RuntimeError("Unable to find __version__ in mylib/__init__.py")
+    raise RuntimeError("Unable to find __version__ in gradhpo/__init__.py")
 
 
 readme = read('README.rst')
@@ -26,7 +26,7 @@ requirements = '\n'.join(
 
 
 setup(
-    name='mylib',
+    name='gradhpo',
     version=get_version(),
     license='MIT',
     author='Eynullayev A., Rubtsov D., Karpeev G.',

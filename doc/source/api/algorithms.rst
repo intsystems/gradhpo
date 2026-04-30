@@ -5,7 +5,7 @@ Algorithms (``algorithms``)
 OnlineHypergradientOptimizer
 ----------------------------
 
-.. automodule:: mylib.algorithms.online
+.. automodule:: gradhpo.algorithms.online
    :members:
    :undoc-members:
    :show-inheritance:
@@ -13,7 +13,7 @@ OnlineHypergradientOptimizer
 T1T2Optimizer
 -------------
 
-.. automodule:: mylib.algorithms.t1t2
+.. automodule:: gradhpo.algorithms.t1t2
    :members:
    :undoc-members:
    :show-inheritance:
@@ -21,7 +21,7 @@ T1T2Optimizer
 GreedyOptimizer
 ---------------
 
-.. automodule:: mylib.algorithms.greedy
+.. automodule:: gradhpo.algorithms.greedy
    :members:
    :undoc-members:
    :show-inheritance:
@@ -29,7 +29,7 @@ GreedyOptimizer
 Бейзлайны
 ---------
 
-.. automodule:: mylib.algorithms.baselines
+.. automodule:: gradhpo.algorithms.baselines
    :members:
    :undoc-members:
    :show-inheritance:

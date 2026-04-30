@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-The :mod:`mylib.train` contains classes:
+The :mod:`gradhpo.train` contains classes:
 
-- :class:`mylib.train.Trainer`
+- :class:`gradhpo.train.Trainer`
 
-The :mod:`mylib.train` contains functions:
+The :mod:`gradhpo.train` contains functions:
 
-- :func:`mylib.train.cv_parameters`
+- :func:`gradhpo.train.cv_parameters`
 '''
 from __future__ import print_function
 

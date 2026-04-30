@@ -8,12 +8,12 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from mylib.core.state import BilevelState
-from mylib.core.types import DataBatch, LossFunctions, PyTree, LossFn
-from mylib.algorithms.online import OnlineHypergradientOptimizer
-from mylib.algorithms.baselines import FOOptimizer, OneStepOptimizer
-from mylib.algorithms.t1t2 import T1T2Optimizer
-from mylib.utils.gradients import (
+from gradhpo.core.state import BilevelState
+from gradhpo.core.types import DataBatch, LossFunctions, PyTree, LossFn
+from gradhpo.algorithms.online import OnlineHypergradientOptimizer
+from gradhpo.algorithms.baselines import FOOptimizer, OneStepOptimizer
+from gradhpo.algorithms.t1t2 import T1T2Optimizer
+from gradhpo.utils.gradients import (
     tree_l2_norm,
     tree_normalize,
     tree_dot,

@@ -31,9 +31,9 @@ import numpy as np
 
 # -- make the library importable when running from the repo root --
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from mylib.algorithms.online import OnlineHypergradientOptimizer
-from mylib.algorithms.baselines import OneStepOptimizer
-from mylib.utils.gradients import tree_zeros_like
+from gradhpo.algorithms.online import OnlineHypergradientOptimizer
+from gradhpo.algorithms.baselines import OneStepOptimizer
+from gradhpo.utils.gradients import tree_zeros_like
 
 # ---------------------------------------------------------------------------
 # Simple MLP model (pure JAX, no Flax/Haiku)

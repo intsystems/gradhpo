@@ -17,9 +17,9 @@
    *DARTS: Differentiable Architecture Search*.
    ICLR 2019. `arXiv:1806.09055 <https://arxiv.org/abs/1806.09055>`_
 
-.. [Agarwal2021] Agarwal, A., Kakade, S. M., Lee, J. D., & Mahajan, G. (2021).
-   *On the Theory of Policy Gradient Methods: Optimality, Approximation, and Distribution Shift*.
-   `arXiv:6297 <https://arxiv.org/abs/2110.02508>`_
+.. [Anonymous2025] Anonymous. (2025).
+   *Generalized Greedy Gradient Hyperparameter Optimization*.
+   Under review at ICLR 2025.
 
 Смежные работы
 ==============

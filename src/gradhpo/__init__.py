@@ -1,7 +1,7 @@
 __version__ = '0.1.0'
 
 # New OOP API
-from mylib.core import (
+from gradhpo.core import (
     BilevelState,
     BilevelOptimizer,
     PyTree,
@@ -10,12 +10,12 @@ from mylib.core import (
     DataBatch,
     LossFunctions,
 )
-from mylib.algorithms import (
+from gradhpo.algorithms import (
     OnlineHypergradientOptimizer,
     FOOptimizer,
     OneStepOptimizer,
 )
-from mylib.utils import (
+from gradhpo.utils import (
     tree_l2_norm,
     tree_normalize,
     tree_dot,

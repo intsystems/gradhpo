@@ -7,10 +7,10 @@ import jax
 import jax.numpy as jnp
 import optax
 
-from mylib.core.base import BilevelOptimizer
-from mylib.core.state import BilevelState
-from mylib.core.types import PyTree, LossFn
-from mylib.utils.gradients import (
+from gradhpo.core.base import BilevelOptimizer
+from gradhpo.core.state import BilevelState
+from gradhpo.core.types import PyTree, LossFn
+from gradhpo.utils.gradients import (
     tree_zeros_like,
     vjp_wrt_lambda,
 )

@@ -20,27 +20,33 @@ Welcome to GradHpO
 ==================
 
 GradHpO --- библиотека на JAX для градиентного подбора гиперпараметров
-в задачах билевел-оптимизации.  Реализованы четыре алгоритма с единым
-интерфейсом :class:`~mylib.core.base.BilevelOptimizer`:
+в задачах билевел-оптимизации.  Реализованы пять алгоритмов с единым
+интерфейсом :class:`~gradhpo.core.base.BilevelOptimizer`:
 
-- **T1-T2 с DARTS-аппроксимацией** --- классический подход с конечно-разностной
-  оценкой гиперградиента.
-- **Greedy** --- обобщённый жадный метод с развёрткой внутреннего цикла.
 - **HyperDistill** --- онлайн-оптимизация с EMA-дистилляцией весов
   (Lee et al., ICLR 2022).
-- **Бейзлайны** --- first-order (FO) и one-step lookahead (Luketina et al., 2016).
+- **T1-T2 с DARTS-аппроксимацией** --- классический подход с конечно-разностной
+  оценкой гиперградиента (Luketina et al., 2016; Liu et al., 2018).
+- **Greedy** --- обобщённый жадный метод с развёрткой внутреннего цикла
+  (Anonymous, ICLR 2025).
+- **FO (First-Order)** --- бейзлайн на основе прямого градиента.
+- **One-Step** --- бейзлайн с учётом одного шага lookahead (Luketina et al., 2016).
 
 Ключевые особенности
 ~~~~~~~~~~~~~~~~~~~~
 
 - **Единый API** --- все алгоритмы наследуют ``BilevelOptimizer`` с методами
-  ``init``, ``step``, ``compute_hypergradient``.
+  ``init``, ``step``, ``compute_hypergradient``, ``run``.
 - **Произвольные pytree** --- параметры модели и гиперпараметры могут быть
   любой вложенной структурой JAX-массивов.
-- **Совместимость с Optax** --- внутренний и внешний оптимизаторы задаются
-  через ``optax.GradientTransformation``.
-- **Пользовательская функция шага** --- вместо optax-оптимизатора можно
-  передать произвольную функцию ``Phi(w, lam, batch) -> w_new``.
+- **JAX-совместимый ``BilevelState``** --- состояние зарегистрировано как
+  JAX pytree, что позволяет передавать его через ``jax.jit`` и ``jax.vmap``.
+- **JIT-компиляция** --- все пять методов ``step()`` декорированы
+  ``@partial(jax.jit, static_argnums=(0, 4, 5, 6))``.
+- **Совместимость с Optax** --- ``GreedyOptimizer`` принимает
+  ``optax.GradientTransformation`` для внутреннего и внешнего оптимизаторов.
+- **Пользовательская функция шага** --- остальные алгоритмы принимают
+  произвольную функцию ``update_fn(w, lam, batch) -> w_new``.
 
 Быстрый старт
 ~~~~~~~~~~~~~~
@@ -49,7 +55,7 @@ GradHpO --- библиотека на JAX для градиентного под
 
    import jax
    import optax
-   from mylib import OnlineHypergradientOptimizer, BilevelState
+   from gradhpo import OnlineHypergradientOptimizer, BilevelState
 
    # Задаём update_fn: один шаг SGD с поэлементным LR
    def update_fn(w, lr_params, batch):

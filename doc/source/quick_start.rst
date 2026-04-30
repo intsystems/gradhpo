@@ -44,7 +44,7 @@
 
 .. code-block:: python
 
-   from mylib import OnlineHypergradientOptimizer
+   from gradhpo import OnlineHypergradientOptimizer
 
    w_init = {'w': jnp.zeros(10)}
    lam_init = {'log_lam': jnp.array(0.0)}
@@ -87,25 +87,65 @@
 Сравнение нескольких методов
 ============================
 
-Тот же интерфейс работает для всех алгоритмов:
+Тот же интерфейс работает для всех алгоритмов.  Для ``FOOptimizer`` и
+``OneStepOptimizer`` метод ``run()`` требует явного аргумента ``T``
+(число внутренних шагов).  ``GreedyOptimizer`` принимает Optax-оптимизаторы
+вместо ``update_fn`` и не требует ``lr_hyper`` в ``step()``/``run()``.
 
 .. code-block:: python
 
-   from mylib import OneStepOptimizer, FOOptimizer
-   from mylib.algorithms.t1t2 import T1T2Optimizer
+   import optax
+   from gradhpo import (
+       OnlineHypergradientOptimizer,
+       T1T2Optimizer,
+       GreedyOptimizer,
+       FOOptimizer,
+       OneStepOptimizer,
+   )
 
-   methods = {
+   # Алгоритмы на основе update_fn
+   methods_update_fn = {
        'FO':         FOOptimizer(update_fn=update_fn),
        'One-Step':   OneStepOptimizer(update_fn=update_fn),
        'HyperDistill': OnlineHypergradientOptimizer(
                          update_fn=update_fn, gamma=0.99,
                          estimation_period=10, T=20),
+       'T1T2':       T1T2Optimizer(update_fn=update_fn, gamma=0.9, T=20),
    }
 
-   for name, opt in methods.items():
+   for name, opt in methods_update_fn.items():
        st = opt.init(w_init, lam_init)
-       # ... запуск обучения ...
-       print(f"{name}: lambda = ...")
+       # FO и One-Step требуют явного T
+       extra = {'T': 20} if name in ('FO', 'One-Step') else {}
+       st = opt.run(
+           st, M=30,
+           get_train_batch=get_train,
+           get_val_batch=get_val,
+           train_loss_fn=loss_fn,
+           val_loss_fn=loss_fn,
+           lr_hyper=1e-3,
+           **extra,
+       )
+       lam = jax.nn.softplus(st.hyperparams['log_lam'])
+       print(f"{name}: lambda = {lam:.4f}")
+
+   # GreedyOptimizer использует Optax-оптимизаторы
+   greedy = GreedyOptimizer(
+       inner_optimizer=optax.sgd(0.01),
+       outer_optimizer=optax.adam(1e-3),
+       unroll_steps=5,
+       gamma=0.9,
+   )
+   gs = greedy.init(w_init, lam_init)
+   gs = greedy.run(
+       gs, M=30,
+       get_train_batch=get_train,
+       get_val_batch=get_val,
+       train_loss_fn=loss_fn,
+       val_loss_fn=loss_fn,
+   )
+   lam = jax.nn.softplus(gs.hyperparams['log_lam'])
+   print(f"Greedy: lambda = {lam:.4f}")
 
 Подробный пример с визуализацией результатов приведён
 в :doc:`tutorial`.  Полное описание API --- в :doc:`api/index`.

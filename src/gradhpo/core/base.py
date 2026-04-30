@@ -5,8 +5,8 @@ from typing import Optional
 
 import optax
 
-from mylib.core.types import PyTree, LossFn, DataBatch
-from mylib.core.state import BilevelState
+from gradhpo.core.types import PyTree, LossFn, DataBatch
+from gradhpo.core.state import BilevelState
 
 
 class BilevelOptimizer(ABC):

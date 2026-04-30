@@ -44,14 +44,17 @@
 
 .. code-block:: python
 
-   import mylib
-   print(mylib.__version__)
+   import gradhpo
+   print(gradhpo.__version__)
 
-   from mylib import (
+   from gradhpo import (
        BilevelState,
        BilevelOptimizer,
        OnlineHypergradientOptimizer,
        T1T2Optimizer,
+       GreedyOptimizer,
+       FOOptimizer,
+       OneStepOptimizer,
    )
 
 Сборка документации
@@ -67,7 +70,7 @@
 Возможные проблемы
 ==================
 
-**ModuleNotFoundError: No module named 'mylib'**
+**ModuleNotFoundError: No module named 'gradhpo'**
    Убедитесь, что установка выполнена в режиме разработки:
    ``pip install -e ./src`` из корня проекта.
 

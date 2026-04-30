@@ -50,37 +50,6 @@
 Реализованные алгоритмы
 =======================
 
-T1-T2 с DARTS
---------------
-
-Алгоритм T1-T2 (Luketina et al., 2016) разделяет шаг обновления
-параметров и гиперпараметров.  В нашей реализации для вычисления
-:math:`B_t` используется DARTS-аппроксимация (Liu et al., 2018)
-на основе конечных разностей:
-
-.. math::
-
-   B_t \approx
-   \frac{\Phi(w, \lambda + \varepsilon e_i) - \Phi(w, \lambda - \varepsilon e_i)}
-   {2\varepsilon}.
-
-Это позволяет избежать явного дифференцирования через оптимизатор.
-
-Greedy
-------
-
-Обобщённый жадный подход (Agarwal et al., 2021) учитывает :math:`T` шагов
-с экспоненциальным затуханием:
-
-.. math::
-
-   \hat{d}_\lambda =
-   \nabla_\lambda L_{\mathrm{val}}(w_T)
-   + \sum_{t=1}^{T} \gamma^{T-t}\,
-     \nabla_{w_t} L_{\mathrm{val}}(w_t) \cdot B_t.
-
-Параметр :math:`\gamma \in (0, 1]` контролирует вклад ранних шагов.
-
 HyperDistill
 -------------
 
@@ -104,6 +73,46 @@ Online-метод с дистилляцией гиперградиента (Lee 
 а скаляр :math:`\theta` оценивается периодически через DrMAD-backward
 (Algorithm 4 из статьи).
 
+Класс: :class:`~gradhpo.algorithms.online.OnlineHypergradientOptimizer`.
+
+T1-T2 с DARTS
+--------------
+
+Алгоритм T1-T2 (Luketina et al., 2016) разделяет шаг обновления
+параметров и гиперпараметров.  В нашей реализации для вычисления
+:math:`B_t` используется DARTS-аппроксимация (Liu et al., 2018)
+на основе конечных разностей:
+
+.. math::
+
+   B_t \approx
+   \frac{\Phi(w, \lambda + \varepsilon e_i) - \Phi(w, \lambda - \varepsilon e_i)}
+   {2\varepsilon}.
+
+Это позволяет избежать явного дифференцирования через оптимизатор.
+
+Класс: :class:`~gradhpo.algorithms.t1t2.T1T2Optimizer`.
+
+Greedy
+------
+
+Обобщённый жадный подход (Anonymous, ICLR 2025) учитывает :math:`T` шагов
+с экспоненциальным затуханием:
+
+.. math::
+
+   \hat{d}_\lambda =
+   \nabla_\lambda L_{\mathrm{val}}(w_T)
+   + \sum_{t=1}^{T} \gamma^{T-t}\,
+     \nabla_{w_t} L_{\mathrm{val}}(w_t) \cdot B_t.
+
+Параметр :math:`\gamma \in (0, 1]` контролирует вклад ранних шагов.
+В отличие от остальных алгоритмов, ``GreedyOptimizer`` принимает
+``inner_optimizer`` и ``outer_optimizer`` как объекты ``optax.GradientTransformation``
+вместо пользовательской функции ``update_fn``.
+
+Класс: :class:`~gradhpo.algorithms.greedy.GreedyOptimizer`.
+
 Бейзлайны
 ----------
 
@@ -116,6 +125,9 @@ Online-метод с дистилляцией гиперградиента (Lee 
   :math:`g = g_{\mathrm{FO}} + \alpha_T \cdot B_T`.
   Эквивалентен HyperDistill с :math:`\gamma = 0`.
 
+Классы: :class:`~gradhpo.algorithms.baselines.FOOptimizer`,
+:class:`~gradhpo.algorithms.baselines.OneStepOptimizer`.
+
 Архитектура библиотеки
 ======================
 
@@ -126,10 +138,26 @@ Online-метод с дистилляцией гиперградиента (Lee 
    class BilevelOptimizer(ABC):
        def init(self, params, hyperparams) -> BilevelState: ...
        def step(self, state, train_batch, val_batch,
-                train_loss_fn, val_loss_fn) -> BilevelState: ...
+                train_loss_fn, val_loss_fn, lr_hyper) -> BilevelState: ...
        def compute_hypergradient(self, state, train_batch, val_batch,
                                  train_loss_fn, val_loss_fn) -> PyTree: ...
+
+.. note::
+
+   Сигнатура ``step()`` у ``GreedyOptimizer`` не принимает ``lr_hyper``
+   (шаг внешнего оптимизатора задаётся через ``outer_optimizer`` при
+   инициализации).  У всех остальных алгоритмов ``lr_hyper`` --- обязательный
+   аргумент.
 
 Состояние оптимизации хранится в ``BilevelState`` --- неизменяемом
 контейнере с полями ``params``, ``hyperparams``, ``inner_opt_state``,
 ``outer_opt_state``, ``step`` и ``metadata``.
+
+``BilevelState`` зарегистрирован как JAX pytree через
+``jax.tree_util.register_pytree_node``, что позволяет передавать его
+напрямую в ``jax.jit``, ``jax.vmap`` и другие JAX-трансформации.
+
+Все пять методов ``step()`` декорированы
+``@partial(jax.jit, static_argnums=(0, 4, 5, 6))``, где статические
+аргументы --- ``self`` (0), ``train_loss_fn`` (4), ``val_loss_fn`` (5),
+``lr_hyper`` (6).

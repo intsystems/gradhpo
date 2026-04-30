@@ -1,8 +1,8 @@
-"""T1-T2 optimizer with numerical DARTS approximation.
+"""OnlineHypergradientOptimizer: HyperDistill algorithm (Lee et al., ICLR 2022).
 
-Implements the T1-T2 algorithm from Luketina et al. (2016) with numerical
-DARTS approximation as described in Liu et al. (2018).
+Implements online hyperparameter meta-learning with hypergradient distillation.
 """
+
 from functools import partial
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -10,10 +10,10 @@ import jax
 import jax.numpy as jnp
 import optax
 
-from mylib.core.base import BilevelOptimizer
-from mylib.core.state import BilevelState
-from mylib.core.types import PyTree, LossFn
-from mylib.utils.gradients import (
+from gradhpo.core.base import BilevelOptimizer
+from gradhpo.core.state import BilevelState
+from gradhpo.core.types import PyTree, LossFn
+from gradhpo.utils.gradients import (
     tree_zeros_like,
     tree_l2_norm,
     tree_normalize,
@@ -25,52 +25,51 @@ from mylib.utils.gradients import (
 )
 
 
-class T1T2Optimizer(BilevelOptimizer):
-    """T1-T2 optimizer with numerical DARTS approximation.
-    
-    Implements the T1-T2 algorithm with a fixed horizon length and uses
-    numerical DARTS approximation for computing the hypergradient.
-    
+class OnlineHypergradientOptimizer(BilevelOptimizer):
+    """Online optimization with hypergradient distillation.
+
+    Implements Algorithm 3 and Algorithm 4 from Lee et al. (ICLR 2022).
+
     Attributes:
         inner_optimizer: Optax optimizer for parameters (optional if update_fn given).
-        outer_optimizer: Optax optimizer for hyperparameters (optional).
-        gamma: EMA decay factor in [0, 1] for weight distillation.
+        outer_optimizer: Optax optimizer for hyperparameters (optional, falls back to SGD).
+        gamma: EMA decay factor in [0, 1].
+        estimation_period: Re-estimate theta every N episodes.
         T: Number of inner steps per episode.
         update_fn: Optional custom inner step function Phi(w, lam, batch) -> w_new.
-        eps: Small epsilon for numerical differentiation in DARTS approximation.
     """
 
     def __init__(
         self,
         inner_optimizer: Optional[optax.GradientTransformation] = None,
         outer_optimizer: Optional[optax.GradientTransformation] = None,
-        gamma: float = 0.9,
+        gamma: float = 0.99,
+        estimation_period: int = 50,
         T: int = 20,
         update_fn: Optional[Callable] = None,
-        eps: float = 1e-4,
     ):
-        """Initialize T1-T2 optimizer with numerical DARTS approximation.
-        
+        """Initialize Online Hypergradient optimizer.
+
         Args:
             inner_optimizer: Optax optimizer for parameters.
             outer_optimizer: Optax optimizer for hyperparameters.
-            gamma: EMA decay factor for weight distillation.
+            gamma: EMA decay factor.
+            estimation_period: Re-estimate theta every N episodes.
             T: Inner steps per episode.
             update_fn: Custom inner step Phi(w, lam, batch) -> w_new.
                        If provided, inner_optimizer is not used.
-            eps: Epsilon for numerical differentiation in DARTS approximation.
         """
         super().__init__(inner_optimizer, outer_optimizer)
         self.gamma = gamma
+        self.estimation_period = estimation_period
         self.T = T
         self._update_fn = update_fn
-        self.eps = eps
 
     def _get_inner_step_fn(
         self, state: BilevelState, train_loss_fn: LossFn,
     ) -> Callable:
         """Return the inner step function Phi(w, lam, batch) -> w_new.
-        
+
         If a custom update_fn was provided, use it directly.
         Otherwise, build one from train_loss_fn + inner_optimizer.
         """
@@ -93,11 +92,11 @@ class T1T2Optimizer(BilevelOptimizer):
         hyperparams: PyTree,
     ) -> BilevelState:
         """Initialize state with hypergradient memory.
-        
+
         Args:
             params: Initial model parameters.
             hyperparams: Initial hyperparameters.
-            
+
         Returns:
             Initial BilevelState.
         """
@@ -120,6 +119,8 @@ class T1T2Optimizer(BilevelOptimizer):
             step=0,
             metadata={
                 "w_star": params,
+                "theta": 1.0,
+                "phi": params,
             },
         )
 
@@ -131,23 +132,23 @@ class T1T2Optimizer(BilevelOptimizer):
         train_loss_fn: LossFn,
         val_loss_fn: LossFn,
     ) -> PyTree:
-        """Compute hypergradient w.r.t. hyperparameters using numerical DARTS approximation.
-        
-        Uses the T1-T2 approximation with numerical DARTS: 
-        g = g_FO + sum_{t=1}^T (alpha_t @ dPhi(w_{t-1}, lam; D_t) / dlam)
-        
+        """Compute hypergradient w.r.t. hyperparameters.
+
+        Uses the HyperDistill approximation: g = g_FO + theta * pi_t * v_t.
+
         Args:
-            state: Current state (must have w_star in metadata).
+            state: Current state (must have w_star, theta in metadata).
             train_batch: Training batch.
             val_batch: Validation batch.
             train_loss_fn: Training loss function.
             val_loss_fn: Validation loss function.
-            
+
         Returns:
             Hypergradient with same structure as hyperparams.
         """
         t = state.step
         w_star = state.get_metric("w_star")
+        theta = state.get_metric("theta", 1.0)
 
         phi_fn = self._get_inner_step_fn(state, train_loss_fn)
 
@@ -162,76 +163,16 @@ class T1T2Optimizer(BilevelOptimizer):
         g_fo = jax.grad(val_loss_fn, argnums=1)(
             w_new, state.hyperparams, val_batch)
 
-        # Compute v_t using numerical DARTS approximation
-        # v_t = alpha @ dPhi(w_star, lam; D_t) / dlam (numerically approximated)
+        # v_t = alpha @ dPhi(w_star, lam; D_t) / dlam
         w_star_new = update_w_star(w_star, state.params, self.gamma, t)
-        v_t = self._numerical_darts_approximation(
-            phi_fn, w_star_new, state.hyperparams, train_batch, alpha)
+        v_t = vjp_wrt_lambda(phi_fn, w_star_new, state.hyperparams,
+                             train_batch, alpha)
 
-        # g = g_FO + v_t
-        return jax.tree.map(lambda fo, v: fo + v, g_fo, v_t)
+        # scale = theta * (1 - gamma^t) / (1 - gamma)
+        scale = theta * (1.0 - self.gamma ** t) / (1.0 - self.gamma + 1e-10)
 
-    def _numerical_darts_approximation(
-        self,
-        phi_fn: Callable,
-        w: PyTree,
-        lam: PyTree,
-        batch: Any,
-        alpha: PyTree,
-    ) -> PyTree:
-        """Compute alpha @ dPhi/dlambda using numerical DARTS approximation.
-        
-        Uses finite differences to approximate the derivative:
-        dPhi/dlambda ≈ [Phi(w, lam + eps*e_i, batch) - Phi(w, lam - eps*e_i, batch)] / (2*eps)
-        
-        Args:
-            phi_fn: Inner step function Phi(w, lam, batch) -> w_new.
-            w: Model parameters.
-            lam: Hyperparameters.
-            batch: Training batch.
-            alpha: Gradient vector for VJP computation.
-            
-        Returns:
-            alpha @ dPhi/dlambda computed via numerical approximation.
-        """
-        # Flatten hyperparameters for element-wise perturbation
-        flat_lam, tree_def = jax.tree_util.tree_flatten(lam)
-        
-        # Initialize result with zeros of the same structure as lam
-        result_leaves = []
-        
-        # For each element in the flattened hyperparameters, compute finite difference
-        for i, lam_element in enumerate(flat_lam):
-            # Create perturbation vector (only i-th element is non-zero)
-            perturbation_shape = lam_element.shape
-            perturbation = jnp.zeros(perturbation_shape)
-            
-            # Compute gradient for this element using finite differences
-            def compute_element_gradient(pert_val):
-                # Create perturbed hyperparameters
-                perturbed_lam_leaves = [
-                    leaf + (pert_val * jnp.ones(leaf.shape) if j == i else jnp.zeros(leaf.shape))
-                    for j, leaf in enumerate(flat_lam)
-                ]
-                perturbed_lam = jax.tree_util.tree_unflatten(tree_def, perturbed_lam_leaves)
-                
-                # Compute Phi with perturbed hyperparameters
-                w_new = phi_fn(w, perturbed_lam, batch)
-                
-                # Compute dot product with alpha
-                return tree_dot(w_new, alpha)
-            
-            # Use central difference approximation
-            # (f(x+eps) - f(x-eps)) / (2*eps)
-            f_plus = compute_element_gradient(self.eps)
-            f_minus = compute_element_gradient(-self.eps)
-            gradient_element = (f_plus - f_minus) / (2 * self.eps)
-            
-            result_leaves.append(gradient_element * jnp.ones(perturbation_shape))
-        
-        # Reconstruct the tree structure
-        result = jax.tree_util.tree_unflatten(tree_def, result_leaves)
-        return result
+        # g = g_FO + scale * v_t
+        return jax.tree.map(lambda fo, v: fo + scale * v, g_fo, v_t)
 
     @partial(jax.jit, static_argnums=(0, 4, 5, 6))
     def step(
@@ -243,8 +184,8 @@ class T1T2Optimizer(BilevelOptimizer):
         val_loss_fn: LossFn,
         lr_hyper: Optional[float] = None,
     ) -> BilevelState:
-        """Perform one T1-T2 optimization step with numerical DARTS approximation.
-        
+        """Perform one online optimization step with distillation.
+
         Args:
             state: Current bilevel state.
             train_batch: Training data batch.
@@ -252,12 +193,13 @@ class T1T2Optimizer(BilevelOptimizer):
             train_loss_fn: Training loss function.
             val_loss_fn: Validation loss function.
             lr_hyper: Manual learning rate (used when outer_optimizer is None).
-            
+
         Returns:
             Updated state.
         """
         t = state.step + 1
         w_star = state.get_metric("w_star")
+        theta = state.get_metric("theta", 1.0)
 
         phi_fn = self._get_inner_step_fn(state, train_loss_fn)
 
@@ -273,14 +215,17 @@ class T1T2Optimizer(BilevelOptimizer):
         g_fo = jax.grad(val_loss_fn, argnums=1)(
             w_new, state.hyperparams, val_batch)
 
-        # 4. v_t using numerical DARTS approximation
-        v_t = self._numerical_darts_approximation(
-            phi_fn, w_star_new, state.hyperparams, train_batch, alpha)
+        # 4. v_t = alpha @ dPhi(w_star, lam; D_t) / dlam
+        v_t = vjp_wrt_lambda(phi_fn, w_star_new, state.hyperparams,
+                             train_batch, alpha)
 
-        # 5. Hypergradient
-        hyper_grad = jax.tree.map(lambda fo, v: fo + v, g_fo, v_t)
+        # 5. scale = theta * (1 - gamma^t) / (1 - gamma)
+        scale = theta * (1.0 - self.gamma ** t) / (1.0 - self.gamma + 1e-10)
 
-        # 6. Update hyperparams
+        # 6. Hypergradient
+        hyper_grad = jax.tree.map(lambda fo, v: fo + scale * v, g_fo, v_t)
+
+        # 7. Update hyperparams
         if self.outer_optimizer is not None:
             updates, new_outer_opt_state = self.outer_optimizer.update(
                 hyper_grad, state.outer_opt_state, state.hyperparams)
@@ -291,7 +236,7 @@ class T1T2Optimizer(BilevelOptimizer):
                 lambda l, g: l - lr_hyper * g, state.hyperparams, hyper_grad)
             new_outer_opt_state = state.outer_opt_state
 
-        # 7. Update inner opt state (if using optax inner optimizer)
+        # 8. Update inner opt state (if using optax inner optimizer)
         new_inner_opt_state = state.inner_opt_state
         if self.inner_optimizer is not None and self._update_fn is None:
             grads = jax.grad(train_loss_fn, argnums=0)(
@@ -307,8 +252,97 @@ class T1T2Optimizer(BilevelOptimizer):
             step=t,
             metadata={
                 "w_star": w_star_new,
+                "theta": theta,
+                "phi": state.get_metric("phi"),
             },
         )
+
+    def estimate_theta(
+        self,
+        state: BilevelState,
+        train_batches: List[Any],
+        val_batch: Any,
+        train_loss_fn: LossFn,
+        val_loss_fn: LossFn,
+    ) -> float:
+        """Algorithm 4: estimate the scaling parameter theta.
+
+        Runs a forward pass (T inner steps), then a DrMAD-style backward pass
+        to collect samples (x_s, y_s), and fits theta = (x^T y) / (x^T x).
+
+        Args:
+            state: Current state (uses params and hyperparams).
+            train_batches: List of T training batches.
+            val_batch: Validation batch.
+            train_loss_fn: Training loss function.
+            val_loss_fn: Validation loss function.
+
+        Returns:
+            theta: Estimated linear scaling parameter.
+        """
+        phi_fn = self._get_inner_step_fn(state, train_loss_fn)
+        w_init = state.params
+        lam = state.hyperparams
+        T = len(train_batches)
+        gamma = self.gamma
+
+        # --- Forward pass: w_0, w_1, ..., w_T ---
+        weights = [w_init]
+        w = w_init
+        for t in range(T):
+            w = phi_fn(w, lam, train_batches[t])
+            weights.append(w)
+
+        w_0, w_T = weights[0], weights[T]
+
+        # alpha_T = dL_val(w_T, lam) / dw_T
+        alpha_T = jax.grad(val_loss_fn, argnums=0)(w_T, lam, val_batch)
+
+        alpha = alpha_T
+        g_so = tree_zeros_like(lam)
+
+        xs, ys = [], []
+        w_star_est = None
+
+        # --- Backward pass (DrMAD) ---
+        for t_back in range(T, 0, -1):
+            frac = (t_back - 1) / T
+            w_hat = tree_lerp(w_0, w_T, frac)
+
+            alpha_A, alpha_B = vjp_wrt_both(
+                phi_fn, w_hat, lam, train_batches[t_back - 1], alpha)
+
+            g_so = jax.tree.map(lambda a, b: a + b, g_so, alpha_B)
+            alpha = alpha_A
+
+            s = T - t_back + 1
+
+            # Distilled w_s*
+            if s == 1:
+                w_star_est = weights[T - 1]
+            else:
+                gamma_s = gamma ** s
+                p_s = (1.0 - gamma ** (s - 1)) / (1.0 - gamma_s + 1e-10)
+                w_star_est = jax.tree.map(
+                    lambda ws, w: p_s * ws + (1.0 - p_s) * w,
+                    w_star_est, weights[T - s])
+
+            v_s = vjp_wrt_lambda(phi_fn, w_star_est, lam,
+                                 train_batches[T - s], alpha_T)
+
+            v_norm = tree_l2_norm(v_s)
+            x_s = v_norm * (1.0 - gamma ** s) / (1.0 - gamma + 1e-10)
+
+            v_normalized = tree_normalize(v_s)
+            y_s = tree_dot(v_normalized, g_so)
+
+            xs.append(float(x_s))
+            ys.append(float(y_s))
+
+        x = jnp.array(xs)
+        y = jnp.array(ys)
+        theta = float(jnp.dot(x, y) / (jnp.dot(x, x) + 1e-10))
+        return theta
 
     def run(
         self,
@@ -322,10 +356,10 @@ class T1T2Optimizer(BilevelOptimizer):
         lr_hyper: Optional[float] = None,
         callback: Optional[Callable] = None,
     ) -> BilevelState:
-        """Full T1-T2 training loop.
-        
+        """Full HyperDistill training loop (Algorithm 3).
+
         Runs M episodes, each with T inner steps and a Reptile update.
-        
+
         Args:
             state: Initial state (from init()).
             M: Number of outer episodes.
@@ -336,18 +370,26 @@ class T1T2Optimizer(BilevelOptimizer):
             lr_reptile: Reptile learning rate for weight initialization.
             lr_hyper: Manual hyper LR (used when outer_optimizer is None).
             callback: Optional callback(episode, state).
-            
+
         Returns:
             Final BilevelState.
         """
         phi = state.params
 
         for m in range(1, M + 1):
+            # Re-estimate theta periodically (Algorithm 4)
+            if (m - 1) % self.estimation_period == 0:
+                est_batches = [get_train_batch() for _ in range(self.T)]
+                est_val = get_val_batch()
+                theta = self.estimate_theta(
+                    state, est_batches, est_val, train_loss_fn, val_loss_fn)
+                state = state.update(metadata={"theta": theta})
+
             # Reset step counter and params for new episode
             state = state.update(
                 params=phi,
                 step=0,
-                metadata={"w_star": phi},
+                metadata={"w_star": phi, "phi": phi},
             )
 
             lr_current = (
@@ -377,5 +419,5 @@ class T1T2Optimizer(BilevelOptimizer):
                 )
                 callback(m, state)
 
-        state = state.update(params=phi)
+        state = state.update(params=phi, metadata={"phi": phi})
         return state

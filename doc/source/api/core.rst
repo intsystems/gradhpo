@@ -5,7 +5,7 @@ Core (``core``)
 Типы данных
 -----------
 
-.. automodule:: mylib.core.types
+.. automodule:: gradhpo.core.types
    :members:
    :undoc-members:
    :show-inheritance:
@@ -13,7 +13,7 @@ Core (``core``)
 Состояние оптимизации
 ---------------------
 
-.. automodule:: mylib.core.state
+.. automodule:: gradhpo.core.state
    :members:
    :undoc-members:
    :show-inheritance:
@@ -21,7 +21,7 @@ Core (``core``)
 Базовый оптимизатор
 -------------------
 
-.. automodule:: mylib.core.base
+.. automodule:: gradhpo.core.base
    :members:
    :undoc-members:
    :show-inheritance:
