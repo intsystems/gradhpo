@@ -3,6 +3,7 @@
 Implements the T1-T2 algorithm from Luketina et al. (2016) with numerical
 DARTS approximation as described in Liu et al. (2018).
 """
+from functools import partial
 from typing import Any, Callable, List, Optional, Tuple
 
 import jax
@@ -232,6 +233,7 @@ class T1T2Optimizer(BilevelOptimizer):
         result = jax.tree_util.tree_unflatten(tree_def, result_leaves)
         return result
 
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6))
     def step(
         self,
         state: BilevelState,

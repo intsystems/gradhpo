@@ -3,6 +3,7 @@
 Implements online hyperparameter meta-learning with hypergradient distillation.
 """
 
+from functools import partial
 from typing import Any, Callable, List, Optional, Tuple
 
 import jax
@@ -173,6 +174,7 @@ class OnlineHypergradientOptimizer(BilevelOptimizer):
         # g = g_FO + scale * v_t
         return jax.tree.map(lambda fo, v: fo + scale * v, g_fo, v_t)
 
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6))
     def step(
         self,
         state: BilevelState,

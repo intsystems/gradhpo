@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Tuple
+from typing import Callable, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -277,3 +277,65 @@ class GreedyOptimizer(BilevelOptimizer):
             train_loss_fn=train_loss_fn,
             val_loss_fn=val_loss_fn,
         )
+
+    def run(
+        self,
+        state: BilevelState,
+        M: int,
+        get_train_batch: Callable,
+        get_val_batch: Callable,
+        train_loss_fn: LossFn,
+        val_loss_fn: LossFn,
+        lr_reptile: float = 1.0,
+        lr_hyper: Optional[float] = None,
+        callback: Optional[Callable] = None,
+    ) -> BilevelState:
+        """Full Greedy training loop.
+
+        Runs M outer episodes. Each episode performs `unroll_steps` inner
+        gradient steps (the greedy unroll horizon) and then updates
+        hyperparameters with the greedy hypergradient.  A Reptile update
+        is applied to the weight initialisation after every episode.
+
+        Args:
+            state: Initial state (from init()).
+            M: Number of outer episodes.
+            get_train_batch: Callable returning a training batch.
+            get_val_batch: Callable returning a validation batch.
+            train_loss_fn: Training loss function (params, hyperparams, batch).
+            val_loss_fn: Validation loss function (params, hyperparams, batch).
+            lr_reptile: Reptile learning rate for weight initialisation.
+            lr_hyper: Manual hyper LR used when outer_optimizer is None.
+            callback: Optional callback(episode, state).
+
+        Returns:
+            Final BilevelState.
+        """
+        phi = state.params
+
+        for m in range(1, M + 1):
+            # Reset params to current meta-initialisation for each episode
+            state = state.update(params=phi, step=0)
+
+            train_batch = get_train_batch()
+            val_batch = get_val_batch()
+
+            # One greedy step (internally unrolls `unroll_steps` inner steps)
+            state = self.step(
+                state, train_batch, val_batch,
+                train_loss_fn, val_loss_fn,
+            )
+
+            # Reptile update: phi <- phi - lr_reptile * (phi - w_T)
+            phi = jax.tree_util.tree_map(
+                lambda p, wt: p - lr_reptile * (p - wt), phi, state.params)
+
+            if callback is not None:
+                val_b = get_val_batch()
+                val_loss = float(
+                    val_loss_fn(state.params, state.hyperparams, val_b))
+                state = state.update(metadata={"val_loss": val_loss})
+                callback(m, state)
+
+        state = state.update(params=phi)
+        return state

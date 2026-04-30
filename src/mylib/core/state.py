@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Optional
 
+import jax
+
 from mylib.core.types import PyTree
 
 OptState = Any  # optax optimizer state or None
@@ -12,6 +14,18 @@ OptState = Any  # optax optimizer state or None
 class BilevelState:
     """State container for bilevel optimization process.
 
+    Registered as a JAX pytree so that instances can be passed through
+    ``jax.jit``, ``jax.grad``, etc.
+
+    Pytree layout
+    -------------
+    Leaves  : ``params``, ``hyperparams``, ``inner_opt_state``,
+              ``outer_opt_state``, and the *values* of ``metadata``
+              (in sorted-key order).
+    Aux data: ``step`` (int) and the sorted *keys* of ``metadata``
+              (tuple of strings).  Both are Python scalars / tuples and
+              are therefore treated as static by JAX.
+
     Attributes:
         params: Model parameters (inner level).
         hyperparams: Hyperparameters to optimize (outer level).
@@ -19,6 +33,7 @@ class BilevelState:
         outer_opt_state: State of outer optimizer.
         step: Current optimization step.
         metadata: Additional information (losses, norms, etc.).
+                  Values may be JAX arrays or plain Python scalars.
     """
     params: PyTree
     hyperparams: PyTree
@@ -104,3 +119,49 @@ class BilevelState:
             Metric value or default.
         """
         return self.metadata.get(key, default)
+
+
+# ---------------------------------------------------------------------------
+# JAX pytree registration
+# ---------------------------------------------------------------------------
+# Leaves  : params, hyperparams, inner_opt_state, outer_opt_state, and the
+#           *values* of metadata (sorted by key) — all JAX-compatible.
+# Aux data: step (int) and the sorted metadata *keys* (tuple of str) —
+#           both are Python objects treated as static by JAX.
+#
+# This design allows metadata values to be JAX arrays (e.g. loss scalars
+# returned inside jax.jit) while keeping the key names static.
+
+def _bilevel_state_flatten(state: BilevelState):
+    meta_keys = tuple(sorted(state.metadata.keys()))
+    meta_vals = [state.metadata[k] for k in meta_keys]
+    leaves = [
+        state.params,
+        state.hyperparams,
+        state.inner_opt_state,
+        state.outer_opt_state,
+    ] + meta_vals
+    aux = (state.step, meta_keys)
+    return leaves, aux
+
+
+def _bilevel_state_unflatten(aux, leaves):
+    step, meta_keys = aux
+    params, hyperparams, inner_opt_state, outer_opt_state = leaves[:4]
+    meta_vals = leaves[4:]
+    metadata = dict(zip(meta_keys, meta_vals))
+    return BilevelState(
+        params=params,
+        hyperparams=hyperparams,
+        inner_opt_state=inner_opt_state,
+        outer_opt_state=outer_opt_state,
+        step=step,
+        metadata=metadata,
+    )
+
+
+jax.tree_util.register_pytree_node(
+    BilevelState,
+    _bilevel_state_flatten,
+    _bilevel_state_unflatten,
+)

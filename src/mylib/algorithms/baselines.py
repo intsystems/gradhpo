@@ -1,5 +1,6 @@
 """Baseline bilevel optimizers: first-order and one-step lookahead."""
 
+from functools import partial
 from typing import Any, Callable, Optional
 
 import jax
@@ -85,6 +86,7 @@ class FOOptimizer(BilevelOptimizer):
         return jax.grad(val_loss_fn, argnums=1)(
             w_new, state.hyperparams, val_batch)
 
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6))
     def step(
         self,
         state: BilevelState,
@@ -236,6 +238,7 @@ class OneStepOptimizer(BilevelOptimizer):
 
         return jax.tree.map(lambda fo, so: fo + so, g_fo, g_so)
 
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6))
     def step(
         self,
         state: BilevelState,
