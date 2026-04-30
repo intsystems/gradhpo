@@ -1,9 +1,9 @@
-=================
-Список литературы
-=================
+==========
+References
+==========
 
-Основные статьи
-================
+Main Papers
+===========
 
 .. [Lee2022] Lee, J., Zaheer, M., Sra, S., & Jadbabaie, A. (2022).
    *Online Hyperparameter Meta-Learning with Hypergradient Distillation*.
@@ -21,8 +21,8 @@
    *Generalized Greedy Gradient Hyperparameter Optimization*.
    Under review at ICLR 2025.
 
-Смежные работы
-==============
+Related Work
+============
 
 .. [Franceschi2017] Franceschi, L., Donini, M., Frasconi, P., & Pontil, M. (2017).
    *Forward and Reverse Gradient-Based Hyperparameter Optimization*.
@@ -40,10 +40,10 @@
    *DrMAD: Distilling Reverse-Mode Automatic Differentiation for Optimizing Hyperparameters of Deep Neural Networks*.
    `arXiv:1601.00917 <https://arxiv.org/abs/1601.00917>`_
 
-Цитирование
-============
+Citation
+========
 
-При использовании библиотеки GradHpO просим ссылаться на:
+If you use GradHpO in your research, please cite:
 
    Eynullayev, A., Rubtsov, D., & Karpeev, G. (2026).
    *GradHpO: Gradient-Based Hyperparameter Optimization*.

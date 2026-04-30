@@ -1,9 +1,9 @@
-==========
-Установка
-==========
+============
+Installation
+============
 
-Из исходников
-=============
+From Source
+===========
 
 .. code-block:: bash
 
@@ -11,15 +11,15 @@
    cd GradHpO
    pip install -e ./src
 
-Зависимости
-===========
+Dependencies
+============
 
 .. list-table::
    :header-rows: 1
    :widths: 30 20
 
-   * - Библиотека
-     - Версия
+   * - Library
+     - Version
    * - JAX
      - >= 0.4.0
    * - jaxlib
@@ -33,14 +33,14 @@
    * - typing-extensions
      - >= 4.5.0
 
-Для сборки документации дополнительно:
+To build the documentation, additionally install:
 
 .. code-block:: bash
 
    pip install -r doc/requirements.txt
 
-Проверка установки
-==================
+Verifying the Installation
+==========================
 
 .. code-block:: python
 
@@ -57,28 +57,28 @@
        OneStepOptimizer,
    )
 
-Сборка документации
-===================
+Building the Documentation
+==========================
 
 .. code-block:: bash
 
    cd doc
    make html
 
-Результат будет в ``doc/build/html/index.html``.
+The output will be in ``doc/build/html/index.html``.
 
-Возможные проблемы
-==================
+Troubleshooting
+===============
 
 **ModuleNotFoundError: No module named 'gradhpo'**
-   Убедитесь, что установка выполнена в режиме разработки:
-   ``pip install -e ./src`` из корня проекта.
+   Make sure the package was installed in development mode:
+   run ``pip install -e ./src`` from the project root.
 
-**Нет GPU-ускорения**
-   JAX по умолчанию использует CPU.  Для GPU установите
-   ``jaxlib`` с поддержкой CUDA согласно
-   `инструкции JAX <https://github.com/google/jax#installation>`_.
+**No GPU acceleration**
+   JAX uses CPU by default.  To enable GPU, install ``jaxlib`` with CUDA
+   support following the
+   `JAX installation guide <https://github.com/google/jax#installation>`_.
 
-**Ошибки при сборке документации**
-   Переустановите зависимости:
+**Documentation build errors**
+   Reinstall the documentation dependencies:
    ``pip install --upgrade -r doc/requirements.txt``.

@@ -1,12 +1,12 @@
 ========
-Обзор
+Overview
 ========
 
-Постановка задачи
-=================
+Problem Formulation
+===================
 
-Задача билевел-оптимизации в контексте машинного обучения формулируется
-как вложенная задача оптимизации:
+The bilevel optimization problem in the machine learning context is formulated
+as a nested optimization problem:
 
 .. math::
 
@@ -14,22 +14,22 @@
    \qquad
    w^*(\lambda) = \arg\min_{w}\; L_{\mathrm{train}}(w,\,\lambda),
 
-где :math:`w` --- параметры модели (внутренний уровень),
-:math:`\lambda` --- гиперпараметры (внешний уровень),
-:math:`L_{\mathrm{train}}` и :math:`L_{\mathrm{val}}` --- функции потерь
-на обучающей и валидационной выборках соответственно.
+where :math:`w` are the model parameters (inner level),
+:math:`\lambda` are the hyperparameters (outer level),
+and :math:`L_{\mathrm{train}}`, :math:`L_{\mathrm{val}}` are the training
+and validation loss functions respectively.
 
-На практике решение :math:`w^*(\lambda)` недоступно аналитически,
-поэтому его аппроксимируют конечным числом шагов оптимизации.
-Обозначим один шаг внутреннего оптимизатора как
-:math:`\Phi(w, \lambda; D)`, тогда после :math:`T` шагов получаем
-:math:`w_T`, который зависит от :math:`\lambda` через всю траекторию.
+In practice, the solution :math:`w^*(\lambda)` is not available in closed
+form, so it is approximated by a finite number of optimization steps.
+Denoting one step of the inner optimizer as :math:`\Phi(w, \lambda; D)`,
+after :math:`T` steps we obtain :math:`w_T`, which depends on
+:math:`\lambda` through the entire trajectory.
 
-Гиперградиент
+Hypergradient
 =============
 
-Полный гиперградиент :math:`\mathrm{d}L_{\mathrm{val}} / \mathrm{d}\lambda`
-раскладывается через chain rule:
+The full hypergradient :math:`\mathrm{d}L_{\mathrm{val}} / \mathrm{d}\lambda`
+is decomposed via the chain rule:
 
 .. math::
 
@@ -39,22 +39,22 @@
      \underbrace{\alpha_t \cdot
        \prod_{s=t+1}^{T} A_s}_{} \cdot B_t,
 
-где :math:`\alpha_t = \nabla_{w_t} L_{\mathrm{val}}(w_t)`,
-:math:`A_s = \partial \Phi / \partial w` и
+where :math:`\alpha_t = \nabla_{w_t} L_{\mathrm{val}}(w_t)`,
+:math:`A_s = \partial \Phi / \partial w`, and
 :math:`B_t = \partial \Phi / \partial \lambda`.
 
-Вычисление полной суммы требует обратного прохода через все :math:`T`
-шагов, что дорого по памяти и времени.  Библиотека GradHpO реализует
-несколько short-horizon аппроксимаций этой суммы.
+Computing the full sum requires backpropagation through all :math:`T` steps,
+which is expensive in memory and time.  GradHpO implements several
+short-horizon approximations of this sum.
 
-Реализованные алгоритмы
-=======================
+Implemented Algorithms
+======================
 
 HyperDistill
 -------------
 
-Online-метод с дистилляцией гиперградиента (Lee et al., ICLR 2022)
-аппроксимирует полный SO-терм через EMA-точку :math:`w^*_t`:
+The online method with hypergradient distillation (Lee et al., ICLR 2022)
+approximates the full second-order term via an EMA point :math:`w^*_t`:
 
 .. math::
 
@@ -62,26 +62,25 @@ Online-метод с дистилляцией гиперградиента (Lee 
    \qquad
    p_t = \frac{\gamma - \gamma^t}{1 - \gamma^t}.
 
-Гиперградиент на шаге :math:`t`:
+The hypergradient at step :math:`t`:
 
 .. math::
 
    g_t = g_{\mathrm{FO}} + \theta \cdot \frac{1 - \gamma^t}{1 - \gamma}
    \cdot v_t,
 
-где :math:`v_t = \alpha_t \cdot \partial\Phi(w^*_t, \lambda) / \partial\lambda`,
-а скаляр :math:`\theta` оценивается периодически через DrMAD-backward
-(Algorithm 4 из статьи).
+where :math:`v_t = \alpha_t \cdot \partial\Phi(w^*_t, \lambda) / \partial\lambda`,
+and the scalar :math:`\theta` is estimated periodically via a DrMAD-style
+backward pass (Algorithm 4 in the paper).
 
-Класс: :class:`~gradhpo.algorithms.online.OnlineHypergradientOptimizer`.
+Class: :class:`~gradhpo.algorithms.online.OnlineHypergradientOptimizer`.
 
-T1-T2 с DARTS
---------------
+T1-T2 with DARTS
+-----------------
 
-Алгоритм T1-T2 (Luketina et al., 2016) разделяет шаг обновления
-параметров и гиперпараметров.  В нашей реализации для вычисления
-:math:`B_t` используется DARTS-аппроксимация (Liu et al., 2018)
-на основе конечных разностей:
+The T1-T2 algorithm (Luketina et al., 2016) separates the parameter and
+hyperparameter update steps.  In our implementation, :math:`B_t` is computed
+using the DARTS finite-difference approximation (Liu et al., 2018):
 
 .. math::
 
@@ -89,15 +88,15 @@ T1-T2 с DARTS
    \frac{\Phi(w, \lambda + \varepsilon e_i) - \Phi(w, \lambda - \varepsilon e_i)}
    {2\varepsilon}.
 
-Это позволяет избежать явного дифференцирования через оптимизатор.
+This avoids explicit differentiation through the optimizer.
 
-Класс: :class:`~gradhpo.algorithms.t1t2.T1T2Optimizer`.
+Class: :class:`~gradhpo.algorithms.t1t2.T1T2Optimizer`.
 
 Greedy
 ------
 
-Обобщённый жадный подход (Anonymous, ICLR 2025) учитывает :math:`T` шагов
-с экспоненциальным затуханием:
+The generalized greedy approach (Anonymous, ICLR 2025) accounts for
+:math:`T` steps with exponential decay:
 
 .. math::
 
@@ -106,32 +105,32 @@ Greedy
    + \sum_{t=1}^{T} \gamma^{T-t}\,
      \nabla_{w_t} L_{\mathrm{val}}(w_t) \cdot B_t.
 
-Параметр :math:`\gamma \in (0, 1]` контролирует вклад ранних шагов.
-В отличие от остальных алгоритмов, ``GreedyOptimizer`` принимает
-``inner_optimizer`` и ``outer_optimizer`` как объекты ``optax.GradientTransformation``
-вместо пользовательской функции ``update_fn``.
+The parameter :math:`\gamma \in (0, 1]` controls the contribution of early
+steps.  Unlike other algorithms, ``GreedyOptimizer`` accepts
+``inner_optimizer`` and ``outer_optimizer`` as ``optax.GradientTransformation``
+objects instead of a custom ``update_fn``.
 
-Класс: :class:`~gradhpo.algorithms.greedy.GreedyOptimizer`.
+Class: :class:`~gradhpo.algorithms.greedy.GreedyOptimizer`.
 
-Бейзлайны
-----------
+Baselines
+---------
 
-- **FO (First-Order)**: использует только прямой градиент
+- **FO (First-Order)**: uses only the direct gradient
   :math:`g_{\mathrm{FO}} = \partial L_{\mathrm{val}} / \partial \lambda`.
-  Если :math:`\lambda` не входит в :math:`L_{\mathrm{val}}` напрямую,
-  обновление нулевое.
+  If :math:`\lambda` does not appear directly in :math:`L_{\mathrm{val}}`,
+  the update is zero.
 
-- **One-Step**: учитывает :math:`B_t` только на последнем шаге,
+- **One-Step**: accounts for :math:`B_t` only at the last step,
   :math:`g = g_{\mathrm{FO}} + \alpha_T \cdot B_T`.
-  Эквивалентен HyperDistill с :math:`\gamma = 0`.
+  Equivalent to HyperDistill with :math:`\gamma = 0`.
 
-Классы: :class:`~gradhpo.algorithms.baselines.FOOptimizer`,
+Classes: :class:`~gradhpo.algorithms.baselines.FOOptimizer`,
 :class:`~gradhpo.algorithms.baselines.OneStepOptimizer`.
 
-Архитектура библиотеки
-======================
+Library Architecture
+====================
 
-Все алгоритмы наследуют от ``BilevelOptimizer`` и реализуют три метода:
+All algorithms inherit from ``BilevelOptimizer`` and implement three methods:
 
 .. code-block:: python
 
@@ -144,20 +143,20 @@ Greedy
 
 .. note::
 
-   Сигнатура ``step()`` у ``GreedyOptimizer`` не принимает ``lr_hyper``
-   (шаг внешнего оптимизатора задаётся через ``outer_optimizer`` при
-   инициализации).  У всех остальных алгоритмов ``lr_hyper`` --- обязательный
-   аргумент.
+   The ``step()`` signature of ``GreedyOptimizer`` does not include
+   ``lr_hyper`` (the outer optimizer step size is set via ``outer_optimizer``
+   at construction time).  All other algorithms require ``lr_hyper`` as a
+   mandatory argument.
 
-Состояние оптимизации хранится в ``BilevelState`` --- неизменяемом
-контейнере с полями ``params``, ``hyperparams``, ``inner_opt_state``,
-``outer_opt_state``, ``step`` и ``metadata``.
+The optimization state is stored in ``BilevelState`` --- an immutable
+container with fields ``params``, ``hyperparams``, ``inner_opt_state``,
+``outer_opt_state``, ``step``, and ``metadata``.
 
-``BilevelState`` зарегистрирован как JAX pytree через
-``jax.tree_util.register_pytree_node``, что позволяет передавать его
-напрямую в ``jax.jit``, ``jax.vmap`` и другие JAX-трансформации.
+``BilevelState`` is registered as a JAX pytree via
+``jax.tree_util.register_pytree_node``, allowing it to be passed directly
+to ``jax.jit``, ``jax.vmap``, and other JAX transformations.
 
-Все пять методов ``step()`` декорированы
-``@partial(jax.jit, static_argnums=(0, 4, 5, 6))``, где статические
-аргументы --- ``self`` (0), ``train_loss_fn`` (4), ``val_loss_fn`` (5),
-``lr_hyper`` (6).
+All five ``step()`` methods are decorated with
+``@partial(jax.jit, static_argnums=(0, 4, 5, 6))``, where the static
+arguments are ``self`` (0), ``train_loss_fn`` (4), ``val_loss_fn`` (5),
+and ``lr_hyper`` (6).
