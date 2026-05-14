@@ -53,9 +53,9 @@ Pinned ranges from |reqs|:
    * - Library
      - Version
    * - JAX
-     - ``>=0.4.20,<1.0``
+     - ``>=0.4.25,<1.0``
    * - jaxlib
-     - ``>=0.4.20,<1.0``
+     - ``>=0.4.25,<1.0``
    * - optax
      - ``>=0.1.7,<1.0``
    * - chex
@@ -121,6 +121,13 @@ Troubleshooting
    The package is not in the active Python environment.  Install it with
    ``pip install gradhpo`` (PyPI) or ``pip install -e ./src`` from a
    source checkout.
+
+**AttributeError: module 'jax' has no attribute 'tree'**
+   The ``jax.tree`` namespace (``jax.tree.map``, ``jax.tree.leaves``, etc.) was
+   introduced in JAX **0.4.25**.  If you installed an older JAX release the
+   library will raise this error at import time.  Upgrade JAX and jaxlib::
+
+      pip install "jax>=0.4.25" "jaxlib>=0.4.25"
 
 **No GPU acceleration**
    JAX uses CPU by default.  To enable GPU, install ``jaxlib`` with CUDA
