@@ -5,7 +5,7 @@ helpers directly from the top-level package, e.g. ``from gradhpo import
 OnlineHypergradientOptimizer, T1T2Optimizer, GreedyOptimizer``.
 """
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 from gradhpo.algorithms import (
     FOOptimizer,
